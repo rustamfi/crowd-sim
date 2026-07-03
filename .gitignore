@@ -1,0 +1,21 @@
+.env
+__pycache__/
+*.pyc
+.venv/
+CLAUDE.md
+tasks/
+specs/
+ToDo
+
+# Test / tooling caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# macOS
+.DS_Store
+
+# Packaging
+*.egg-info/
+dist/
+build/

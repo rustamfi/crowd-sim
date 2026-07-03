@@ -1,0 +1,1677 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SF Crowd Voting Simulator</title>
+  <style>
+    /* ─── Design tokens ────────────────────────────────────────────────── */
+    :root {
+      --bg:          #f4f5f7;
+      --surface:     #ffffff;
+      --surface-alt: #f9fafb;
+      --border:      #e2e5ea;
+      --text:        #1a202c;
+      --text-muted:  #6b7280;
+      --text-light:  #9ca3af;
+
+      --blue-dark:   #1e3a5f;
+      --blue:        #2d5f8a;
+      --blue-light:  #e8f0f8;
+      --gold:        #c88b2f;
+      --gold-light:  #fdf3e3;
+      --gray-warm:   #8c8074;
+
+      --yes:         #2e7d32;
+      --yes-bg:      #e8f5e9;
+      --no:          #c62828;
+      --no-bg:       #ffebee;
+      --null-color:  #78909c;
+      --null-bg:     #eceff1;
+
+      --shadow-sm:   0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.06);
+      --shadow-md:   0 4px 12px rgba(0,0,0,.10), 0 2px 4px rgba(0,0,0,.06);
+      --shadow-lg:   0 8px 24px rgba(0,0,0,.12);
+
+      --radius-sm:   6px;
+      --radius-md:   10px;
+      --radius-lg:   14px;
+
+      --font:        'Inter', system-ui, -apple-system, sans-serif;
+      --mono:        'JetBrains Mono', 'Fira Code', monospace;
+    }
+
+    /* ─── Reset ────────────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+
+    /* ─── Typography ───────────────────────────────────────────────────── */
+    h1, h2, h3, h4 { line-height: 1.25; font-weight: 700; }
+    h1 { font-size: clamp(1.5rem, 3vw, 2.2rem); }
+    h2 { font-size: 1.35rem; }
+    h3 { font-size: 1.05rem; }
+    h4 { font-size: 0.875rem; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); }
+
+    a { color: var(--blue); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    /* ─── Layout ───────────────────────────────────────────────────────── */
+    .container {
+      max-width: 1300px;
+      margin: 0 auto;
+      padding: 0 1.25rem;
+    }
+
+    /* ─── Header ───────────────────────────────────────────────────────── */
+    .site-header {
+      background: linear-gradient(135deg, var(--blue-dark) 0%, var(--blue) 100%);
+      color: #fff;
+      padding: 2rem 0 1.75rem;
+      border-bottom: 3px solid var(--gold);
+    }
+
+    .header-inner {
+      display: flex;
+      align-items: flex-end;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .header-text { flex: 1 1 300px; }
+
+    .header-text h1 {
+      color: #fff;
+      margin-bottom: .35rem;
+    }
+
+    /* ─── Controls bar ─────────────────────────────────────────────────── */
+    .controls-bar {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .controls-inner {
+      display: flex;
+      align-items: center;
+      gap: .75rem;
+      padding: .85rem 0;
+      flex-wrap: wrap;
+    }
+
+    .controls-left {
+      display: flex;
+      align-items: center;
+      gap: .75rem;
+      flex: 1;
+      flex-wrap: wrap;
+    }
+
+    .seed-group {
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+    }
+
+    .seed-group label {
+      font-size: .8rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      white-space: nowrap;
+    }
+
+    .seed-input {
+      width: 70px;
+      padding: .35rem .5rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      font-size: .85rem;
+      font-family: var(--mono);
+      color: var(--text);
+      background: var(--surface-alt);
+      outline: none;
+      transition: border-color .15s;
+    }
+
+    .seed-input:focus { border-color: var(--blue); background: var(--surface); }
+
+    .status-text {
+      font-size: .8rem;
+      color: var(--text-muted);
+      margin-left: auto;
+    }
+
+    .status-text .status-count {
+      font-weight: 700;
+      color: var(--blue);
+    }
+
+    /* ─── Buttons ──────────────────────────────────────────────────────── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: .45rem;
+      padding: .5rem 1.1rem;
+      border: none;
+      border-radius: var(--radius-sm);
+      font-family: var(--font);
+      font-size: .85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background .15s, box-shadow .15s, opacity .15s, transform .1s;
+      white-space: nowrap;
+      outline: none;
+    }
+
+    .btn:focus-visible {
+      outline: 2px solid var(--blue);
+      outline-offset: 2px;
+    }
+
+    .btn:active:not(:disabled) { transform: translateY(1px); }
+
+    .btn-primary {
+      background: var(--blue);
+      color: #fff;
+    }
+
+    .btn-primary:hover:not(:disabled) { background: var(--blue-dark); box-shadow: var(--shadow-md); }
+
+    .btn-gold {
+      background: var(--gold);
+      color: #fff;
+    }
+
+    .btn-gold:hover:not(:disabled) { background: #b07828; box-shadow: var(--shadow-md); }
+
+    .btn:disabled {
+      opacity: .45;
+      cursor: not-allowed;
+    }
+
+    /* Spinner */
+    .spinner {
+      width: 14px;
+      height: 14px;
+      border: 2px solid rgba(255,255,255,.35);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+      flex-shrink: 0;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ─── Error banner ─────────────────────────────────────────────────── */
+    .error-banner {
+      background: #fff5f5;
+      border: 1px solid #feb2b2;
+      border-left: 4px solid var(--no);
+      border-radius: var(--radius-sm);
+      padding: .75rem 1rem;
+      font-size: .85rem;
+      color: #742a2a;
+      display: none;
+      align-items: flex-start;
+      gap: .6rem;
+      margin: 1rem 0 0;
+    }
+
+    .error-banner.visible { display: flex; }
+
+    .error-banner .error-icon { flex-shrink: 0; font-size: 1rem; }
+
+    .error-close {
+      margin-left: auto;
+      background: none;
+      border: none;
+      color: #742a2a;
+      cursor: pointer;
+      font-size: 1rem;
+      line-height: 1;
+      padding: 0;
+      opacity: .6;
+    }
+
+    .error-close:hover { opacity: 1; }
+
+    /* ─── Main content ─────────────────────────────────────────────────── */
+    .main-content {
+      padding: 1.75rem 0 3rem;
+    }
+
+    /* ─── Section headers ──────────────────────────────────────────────── */
+    .section-header {
+      display: flex;
+      align-items: center;
+      gap: .75rem;
+      margin-bottom: 1.1rem;
+    }
+
+    .section-header h2 { flex: 1; }
+
+    .collapse-toggle {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: .2rem;
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--text-muted);
+      border-radius: var(--radius-sm);
+      transition: color .15s, background .15s;
+    }
+    .collapse-toggle:hover { color: var(--text); background: var(--surface-alt); }
+    .collapse-toggle .chevron { transition: transform .2s ease; }
+    section.collapsed .collapse-toggle .chevron { transform: rotate(-90deg); }
+    section.collapsed .agent-grid { display: none; }
+
+    .section-divider {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 2rem 0;
+    }
+
+    /* ─── Ballot question panel ────────────────────────────────────────── */
+    .question-panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-sm);
+      padding: 1.1rem 1.25rem 1.25rem;
+      margin-bottom: 1.75rem;
+    }
+    .question-panel .question-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: .75rem;
+      margin-bottom: .55rem;
+    }
+    .question-panel label {
+      font-size: .82rem;
+      font-weight: 600;
+      letter-spacing: .02em;
+      color: var(--text);
+    }
+    .question-panel .question-hint {
+      font-size: .74rem;
+      color: var(--text-muted);
+    }
+    .question-input {
+      width: 100%;
+      min-height: 4.5rem;
+      resize: vertical;
+      padding: .65rem .75rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--surface-alt);
+      color: var(--text);
+      font-family: var(--font);
+      font-size: .9rem;
+      line-height: 1.5;
+    }
+    .question-input:focus {
+      outline: none;
+      border-color: var(--blue);
+      background: var(--surface);
+    }
+    .question-actions {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: .55rem;
+    }
+    .question-reset {
+      background: none;
+      border: none;
+      color: var(--blue);
+      font-family: var(--font);
+      font-size: .78rem;
+      cursor: pointer;
+      padding: .1rem .2rem;
+    }
+    .question-reset:hover { text-decoration: underline; }
+    .question-reset:disabled { color: var(--text-light); cursor: default; text-decoration: none; }
+
+    /* ─── Empty state ──────────────────────────────────────────────────── */
+    .empty-state {
+      text-align: center;
+      padding: 3rem 1rem;
+      color: var(--text-muted);
+    }
+
+    .empty-state .empty-icon {
+      font-size: 2.5rem;
+      margin-bottom: .75rem;
+      opacity: .5;
+    }
+
+    .empty-state p { font-size: .9rem; }
+
+    /* ─── Agent grid ───────────────────────────────────────────────────── */
+    .agent-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+      gap: 1rem;
+    }
+
+    /* ─── Agent card ───────────────────────────────────────────────────── */
+    .agent-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 1rem 1.1rem;
+      box-shadow: var(--shadow-sm);
+      transition: box-shadow .2s, border-color .2s;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .agent-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+      background: var(--border);
+      transition: background .3s;
+    }
+
+    .agent-card.voted-yes::before  { background: var(--yes); }
+    .agent-card.voted-no::before   { background: var(--no); }
+
+    .agent-card:hover {
+      box-shadow: var(--shadow-md);
+      border-color: #c5cdd8;
+    }
+
+    .card-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: .5rem;
+      margin-bottom: .6rem;
+    }
+
+    .card-name {
+      font-size: .95rem;
+      font-weight: 700;
+      color: var(--text);
+      line-height: 1.3;
+    }
+
+    .card-age {
+      font-size: .8rem;
+      color: var(--text-muted);
+      font-weight: 400;
+    }
+
+    .vote-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: .25rem;
+      padding: .2rem .6rem;
+      border-radius: 100px;
+      font-size: .72rem;
+      font-weight: 700;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+      flex-shrink: 0;
+    }
+
+    .vote-badge.yes { background: var(--yes-bg); color: var(--yes); }
+    .vote-badge.no  { background: var(--no-bg);  color: var(--no);  }
+    .vote-badge.null { background: var(--null-bg); color: var(--null-color); }
+
+    .card-meta {
+      display: flex;
+      flex-direction: column;
+      gap: .22rem;
+      margin-bottom: .75rem;
+    }
+
+    .card-meta-row {
+      display: flex;
+      align-items: center;
+      gap: .4rem;
+      font-size: .8rem;
+      color: var(--text-muted);
+    }
+
+    .card-meta-row .meta-icon {
+      width: 14px;
+      text-align: center;
+      flex-shrink: 0;
+      font-size: .85rem;
+    }
+
+    .card-meta-row .meta-label {
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .card-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .3rem;
+      margin-bottom: .75rem;
+    }
+
+    .tag {
+      display: inline-block;
+      padding: .15rem .5rem;
+      background: var(--blue-light);
+      color: var(--blue-dark);
+      border-radius: 100px;
+      font-size: .7rem;
+      font-weight: 600;
+    }
+
+    .tag.renter { background: var(--gold-light); color: #7a4f00; }
+    .tag.owner  { background: #e8f5e9; color: #1b5e20; }
+
+    /* ─── OCEAN bars ───────────────────────────────────────────────────── */
+    .ocean-section {
+      margin-top: .6rem;
+    }
+
+    .ocean-label {
+      font-size: .68rem;
+      font-weight: 700;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      color: var(--text-light);
+      margin-bottom: .4rem;
+    }
+
+    .ocean-bars {
+      display: flex;
+      flex-direction: column;
+      gap: .28rem;
+    }
+
+    .ocean-row {
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+    }
+
+    .ocean-trait-name {
+      font-size: .68rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      width: 14px;
+      flex-shrink: 0;
+      text-align: center;
+    }
+
+    .ocean-track {
+      flex: 1;
+      height: 5px;
+      background: var(--border);
+      border-radius: 100px;
+      overflow: hidden;
+    }
+
+    .ocean-fill {
+      height: 100%;
+      border-radius: 100px;
+      transition: width .6s ease;
+    }
+
+    /* Trait-specific colors */
+    .ocean-fill.O { background: #6366f1; }
+    .ocean-fill.C { background: #0891b2; }
+    .ocean-fill.E { background: #059669; }
+    .ocean-fill.A { background: #d97706; }
+    .ocean-fill.N { background: #e11d48; }
+
+    .ocean-val {
+      font-size: .68rem;
+      font-family: var(--mono);
+      color: var(--text-muted);
+      width: 22px;
+      text-align: right;
+      flex-shrink: 0;
+    }
+
+    /* ─── Vote reason ──────────────────────────────────────────────────── */
+    .card-reason {
+      margin-top: .75rem;
+      padding-top: .75rem;
+      border-top: 1px solid var(--border);
+      font-size: .8rem;
+      color: var(--text);
+      font-style: italic;
+      line-height: 1.5;
+    }
+
+    /* ─── Results dashboard ────────────────────────────────────────────── */
+    #results-section {
+      display: none;
+    }
+
+    #results-section.visible {
+      display: block;
+    }
+
+    /* Tally row */
+    .tally-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 1rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .tally-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 1.25rem 1.5rem;
+      box-shadow: var(--shadow-sm);
+      text-align: center;
+    }
+
+    .tally-number {
+      font-size: 2.75rem;
+      font-weight: 800;
+      line-height: 1;
+      margin-bottom: .2rem;
+    }
+
+    .tally-number.yes { color: var(--yes); }
+    .tally-number.no  { color: var(--no);  }
+    .tally-number.total { color: var(--blue); }
+
+    .tally-label {
+      font-size: .8rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: .06em;
+    }
+
+    .tally-pct {
+      font-size: .85rem;
+      color: var(--text-muted);
+      margin-top: .15rem;
+    }
+
+    /* Chart */
+    .chart-container {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 1.25rem 1.5rem;
+      box-shadow: var(--shadow-sm);
+      margin-bottom: 1.25rem;
+    }
+
+    .chart-wrap {
+      max-width: 320px;
+      margin: 0 auto;
+      position: relative;
+    }
+
+    /* Themes grid */
+    .themes-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .themes-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 1.1rem 1.25rem;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .themes-card-header {
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+      margin-bottom: .85rem;
+    }
+
+    .themes-card-header .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .dot.yes { background: var(--yes); }
+    .dot.no  { background: var(--no);  }
+
+    .theme-item {
+      display: flex;
+      flex-direction: column;
+      gap: .3rem;
+      padding: .65rem 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .theme-item:last-child { border-bottom: none; padding-bottom: 0; }
+    .theme-item:first-child { padding-top: 0; }
+
+    .theme-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: .5rem;
+    }
+
+    .theme-name {
+      font-size: .85rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .theme-count {
+      font-size: .75rem;
+      font-weight: 700;
+      padding: .1rem .45rem;
+      border-radius: 100px;
+      flex-shrink: 0;
+    }
+
+    .theme-count.yes { background: var(--yes-bg); color: var(--yes); }
+    .theme-count.no  { background: var(--no-bg);  color: var(--no);  }
+
+    .theme-agents {
+      font-size: .74rem;
+      color: var(--text-muted);
+      line-height: 1.4;
+    }
+
+    /* Most interesting */
+    .interesting-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--gold);
+      border-radius: var(--radius-md);
+      padding: 1.25rem 1.5rem;
+      box-shadow: var(--shadow-sm);
+      margin-bottom: 1.25rem;
+    }
+
+    .interesting-card .card-eyebrow {
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+      margin-bottom: .85rem;
+    }
+
+    .interesting-card .card-eyebrow h4 { margin: 0; }
+
+    .interesting-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .35rem;
+      margin-bottom: .75rem;
+      font-size: .8rem;
+    }
+
+    .interesting-meta .imeta {
+      display: inline-flex;
+      align-items: center;
+      gap: .3rem;
+      padding: .2rem .55rem;
+      background: var(--surface-alt);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text-muted);
+    }
+
+    .interesting-meta .imeta strong { color: var(--text); }
+
+    blockquote.interesting-quote {
+      border-left: 3px solid var(--gold);
+      padding: .5rem .75rem .5rem 1rem;
+      font-size: .9rem;
+      font-style: italic;
+      color: var(--text);
+      background: var(--gold-light);
+      border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+      line-height: 1.65;
+    }
+
+    /* ─── Vote filter buttons ──────────────────────────────────────────── */
+    .table-filter-wrap {
+      display: flex;
+      gap: .5rem;
+    }
+
+    .filter-btn {
+      padding: .3rem .7rem;
+      border: 1px solid var(--border);
+      border-radius: 100px;
+      background: var(--surface);
+      font-size: .75rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all .15s;
+      color: var(--text-muted);
+    }
+
+    .filter-btn.active { border-color: var(--blue); background: var(--blue-light); color: var(--blue-dark); }
+    .filter-btn.active-yes { border-color: var(--yes); background: var(--yes-bg); color: var(--yes); }
+    .filter-btn.active-no  { border-color: var(--no);  background: var(--no-bg);  color: var(--no);  }
+
+    /* ─── Loading overlay (for the whole page initial load) ────────────── */
+    .page-loader {
+      position: fixed;
+      inset: 0;
+      background: var(--bg);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 1rem;
+      z-index: 1000;
+      transition: opacity .3s;
+    }
+
+    .page-loader.fade-out { opacity: 0; pointer-events: none; }
+
+    .page-loader .loader-spinner {
+      width: 36px;
+      height: 36px;
+      border: 3px solid var(--border);
+      border-top-color: var(--blue);
+      border-radius: 50%;
+      animation: spin .8s linear infinite;
+    }
+
+    .page-loader p {
+      font-size: .85rem;
+      color: var(--text-muted);
+    }
+
+    /* ─── Progress bar ─────────────────────────────────────────────────── */
+    .progress-bar-wrap {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 1.1rem 1.25rem;
+      box-shadow: var(--shadow-sm);
+      display: none;
+      margin-bottom: 1.25rem;
+    }
+
+    .progress-bar-wrap.visible { display: block; }
+
+    .progress-bar-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: .8rem;
+      color: var(--text-muted);
+      margin-bottom: .5rem;
+    }
+
+    .progress-bar-label strong { color: var(--text); }
+
+    .progress-track {
+      height: 8px;
+      background: var(--border);
+      border-radius: 100px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--blue) 0%, var(--gold) 100%);
+      border-radius: 100px;
+      transition: width .4s ease;
+      width: 0%;
+    }
+
+    /* ─── Responsive ───────────────────────────────────────────────────── */
+    @media (max-width: 900px) {
+      .tally-row { grid-template-columns: 1fr 1fr; }
+      .themes-grid { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 640px) {
+      .agent-grid { grid-template-columns: 1fr; }
+      .tally-row  { grid-template-columns: 1fr; }
+      .themes-grid { grid-template-columns: 1fr; }
+      .header-inner { flex-direction: column; align-items: flex-start; }
+      .controls-inner { flex-direction: column; align-items: flex-start; }
+      .status-text { margin-left: 0; }
+    }
+
+    /* ─── Reduced motion ───────────────────────────────────────────────── */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: .01ms !important;
+        transition-duration: .01ms !important;
+      }
+    }
+
+    /* ─── Skip link (a11y) ─────────────────────────────────────────────── */
+    .skip-link {
+      position: absolute;
+      top: -100%;
+      left: 0;
+      background: var(--blue-dark);
+      color: #fff;
+      padding: .5rem 1rem;
+      font-size: .85rem;
+      font-weight: 600;
+      z-index: 9999;
+      border-radius: 0 0 var(--radius-sm) 0;
+    }
+
+    .skip-link:focus { top: 0; }
+  </style>
+</head>
+<body>
+
+  <!-- Accessibility skip link -->
+  <a class="skip-link" href="#main-content">Skip to main content</a>
+
+  <!-- Page loader -->
+  <div class="page-loader" id="page-loader" role="status" aria-live="polite">
+    <div class="loader-spinner"></div>
+    <p>Loading simulation data&hellip;</p>
+  </div>
+
+  <!-- ── Header ───────────────────────────────────────────────────────── -->
+  <header class="site-header" role="banner">
+    <div class="container">
+      <div class="header-inner">
+        <div class="header-text">
+          <h1>SF Crowd Voting Simulator</h1>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ── Controls bar ─────────────────────────────────────────────────── -->
+  <nav class="controls-bar" role="navigation" aria-label="Simulation controls">
+    <div class="container">
+      <div class="controls-inner">
+        <div class="controls-left">
+          <div class="seed-group">
+            <label for="seed-input">Seed</label>
+            <input
+              type="number"
+              id="seed-input"
+              class="seed-input"
+              value="42"
+              min="1"
+              max="9999"
+              aria-label="Random seed for population generation"
+            />
+          </div>
+
+          <button
+            id="btn-generate"
+            class="btn btn-primary"
+            aria-label="Generate a population of 30 synthetic SF residents"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            Generate Population
+          </button>
+
+          <button
+            id="btn-vote"
+            class="btn btn-gold"
+            disabled
+            aria-label="Run the voting scenario for all agents"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+            Run Vote
+          </button>
+
+          <button
+            id="btn-revote"
+            class="btn btn-gold"
+            disabled
+            style="display:none"
+            aria-label="Re-run voting with fresh non-deterministic results"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+            Re-vote
+          </button>
+        </div>
+
+        <span class="status-text" id="status-text" aria-live="polite" aria-atomic="true">
+          No agents loaded
+        </span>
+      </div>
+
+      <!-- Error banner -->
+      <div class="error-banner" id="error-banner" role="alert">
+        <span class="error-icon" aria-hidden="true">&#9888;</span>
+        <span id="error-message"></span>
+        <button class="error-close" id="error-close" aria-label="Dismiss error">&times;</button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ── Main content ─────────────────────────────────────────────────── -->
+  <main id="main-content" class="main-content">
+    <div class="container">
+
+      <!-- Ballot question -->
+      <section class="question-panel" aria-labelledby="question-label">
+        <div class="question-head">
+          <label id="question-label" for="question-input">Ballot Question</label>
+          <span class="question-hint">Edit to ask the crowd something else, then run the vote.</span>
+        </div>
+        <textarea
+          id="question-input"
+          class="question-input"
+          rows="3"
+          spellcheck="true"
+          aria-describedby="question-label"
+          placeholder="Loading default question&hellip;"
+        ></textarea>
+        <div class="question-actions">
+          <button type="button" id="btn-reset-question" class="question-reset" disabled>
+            Reset to default
+          </button>
+        </div>
+      </section>
+
+      <!-- Agent grid section -->
+      <section id="agents-section" aria-labelledby="agents-heading">
+        <div class="section-header">
+          <button type="button" class="collapse-toggle" id="agents-toggle" aria-expanded="true" aria-controls="agent-grid" aria-label="Collapse or expand agent population">
+            <svg class="chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <h2 id="agents-heading">Agent Population</h2>
+          <span id="agent-count-label" class="status-text" aria-live="polite"></span>
+          <div class="table-filter-wrap" id="agent-filter" role="group" aria-label="Filter agents by vote" style="display:none">
+            <button class="filter-btn active" data-filter="all" aria-pressed="true">All</button>
+            <button class="filter-btn" data-filter="yes" aria-pressed="false">Yes</button>
+            <button class="filter-btn" data-filter="no"  aria-pressed="false">No</button>
+          </div>
+        </div>
+
+        <div id="agent-grid" class="agent-grid" role="list" aria-label="Agent population grid">
+          <div class="empty-state" id="agents-empty">
+            <div class="empty-icon" aria-hidden="true">&#128101;</div>
+            <p>No agents yet. Click <strong>Generate Population</strong> to create 30 synthetic SF residents.</p>
+          </div>
+        </div>
+      </section>
+
+      <hr class="section-divider" />
+
+      <!-- Results section -->
+      <section id="results-section" aria-labelledby="results-heading">
+        <div class="section-header">
+          <h2 id="results-heading">Results Dashboard</h2>
+        </div>
+
+        <!-- Progress bar (shown while voting) -->
+        <div class="progress-bar-wrap" id="progress-wrap" role="status" aria-live="polite">
+          <div class="progress-bar-label">
+            <strong id="progress-label">Running vote&hellip;</strong>
+            <span id="progress-pct">0%</span>
+          </div>
+          <div class="progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" id="progress-bar-aria">
+            <div class="progress-fill" id="progress-fill"></div>
+          </div>
+        </div>
+
+        <!-- Vote tally cards -->
+        <div class="tally-row" role="group" aria-label="Vote tally">
+          <div class="tally-card">
+            <div class="tally-number yes" id="tally-yes">—</div>
+            <div class="tally-label">Yes</div>
+            <div class="tally-pct" id="tally-yes-pct"></div>
+          </div>
+          <div class="tally-card">
+            <div class="tally-number no" id="tally-no">—</div>
+            <div class="tally-label">No</div>
+            <div class="tally-pct" id="tally-no-pct"></div>
+          </div>
+          <div class="tally-card">
+            <div class="tally-number total" id="tally-total">—</div>
+            <div class="tally-label">Total Votes</div>
+            <div class="tally-pct" id="tally-null-info"></div>
+          </div>
+        </div>
+
+        <!-- Donut chart -->
+        <div class="chart-container">
+          <h3 style="margin-bottom:.9rem;font-size:.9rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;">Vote Distribution</h3>
+          <div class="chart-wrap">
+            <canvas id="vote-chart" aria-label="Donut chart showing yes/no vote distribution" role="img"></canvas>
+          </div>
+        </div>
+
+        <!-- Themes -->
+        <div class="themes-grid">
+          <div class="themes-card">
+            <div class="themes-card-header">
+              <div class="dot yes" aria-hidden="true"></div>
+              <h3>Top Yes Reasons</h3>
+            </div>
+            <div id="yes-themes">
+              <p style="font-size:.82rem;color:var(--text-muted);">No data yet.</p>
+            </div>
+          </div>
+          <div class="themes-card">
+            <div class="themes-card-header">
+              <div class="dot no" aria-hidden="true"></div>
+              <h3>Top No Reasons</h3>
+            </div>
+            <div id="no-themes">
+              <p style="font-size:.82rem;color:var(--text-muted);">No data yet.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Most interesting response -->
+        <div class="interesting-card" id="interesting-card" style="display:none;">
+          <div class="card-eyebrow">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2.5" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+            <h4>Most Interesting Response</h4>
+          </div>
+          <div class="interesting-meta" id="interesting-meta"></div>
+          <blockquote class="interesting-quote" id="interesting-quote"></blockquote>
+        </div>
+
+      </section><!-- /results-section -->
+    </div><!-- /container -->
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+  <script>
+  /* ====================================================================
+     SF Crowd Voting Simulator — frontend JS
+     All state lives in the module-scope variables below.
+     No frameworks, no build step — vanilla ES2020.
+  ==================================================================== */
+  'use strict';
+
+  /* ── State ─────────────────────────────────────────────────────────── */
+  let agents     = [];   // Array<AgentObject>
+  let results    = [];   // Array<ResultObject>
+  let summary    = null; // SummaryObject | null
+  let chartInst  = null; // Chart.js instance
+  let defaultQuestion = ''; // Fetched from /api/config; the ballot default
+
+  let agentFilter = 'all'; // Agent Population grid filter: all | yes | no
+
+  /* ── DOM refs ──────────────────────────────────────────────────────── */
+  const $ = (id) => document.getElementById(id);
+
+  const btnGenerate   = $('btn-generate');
+  const btnVote       = $('btn-vote');
+  const btnRevote     = $('btn-revote');
+  const questionInput = $('question-input');
+  const btnResetQ     = $('btn-reset-question');
+  const seedInput     = $('seed-input');
+  const statusText    = $('status-text');
+  const agentGrid     = $('agent-grid');
+  const agentsEmpty   = $('agents-empty');
+  const agentCountLbl = $('agent-count-label');
+  const agentFilterWrap = $('agent-filter');
+  const errorBanner   = $('error-banner');
+  const errorMessage  = $('error-message');
+  const errorClose    = $('error-close');
+  const resultsSection = $('results-section');
+  const pageLoader    = $('page-loader');
+  const progressWrap  = $('progress-wrap');
+  const progressFill  = $('progress-fill');
+  const progressLabel = $('progress-label');
+  const progressPct   = $('progress-pct');
+  const progressAria  = $('progress-bar-aria');
+  const interestingCard = $('interesting-card');
+
+  /* ── API helpers ───────────────────────────────────────────────────── */
+  async function apiFetch(path, options = {}) {
+    const resp = await fetch(path, {
+      headers: { 'Content-Type': 'application/json' },
+      ...options,
+    });
+    if (!resp.ok) {
+      let msg = `HTTP ${resp.status}`;
+      try {
+        const body = await resp.json();
+        msg = body.detail || body.message || msg;
+      } catch (_) { /* ignore */ }
+      throw new Error(msg);
+    }
+    return resp.json();
+  }
+
+  /* ── Error display ─────────────────────────────────────────────────── */
+  function showError(msg) {
+    errorMessage.textContent = msg;
+    errorBanner.classList.add('visible');
+  }
+
+  function hideError() {
+    errorBanner.classList.remove('visible');
+  }
+
+  errorClose.addEventListener('click', hideError);
+
+  /* ── Button loading state ──────────────────────────────────────────── */
+  function setLoading(btn, loading, originalHTML) {
+    if (loading) {
+      btn.dataset.originalHTML = btn.innerHTML;
+      btn.innerHTML = `<span class="spinner" aria-hidden="true"></span> Loading&hellip;`;
+      btn.disabled = true;
+      btn.setAttribute('aria-busy', 'true');
+    } else {
+      btn.innerHTML = btn.dataset.originalHTML || originalHTML;
+      btn.disabled = false;
+      btn.removeAttribute('aria-busy');
+    }
+  }
+
+  /* ── OCEAN bar mini chart ──────────────────────────────────────────── */
+  function renderOceanBars(ocean) {
+    const traits = [
+      { key: 'openness',          label: 'O', cls: 'O' },
+      { key: 'conscientiousness', label: 'C', cls: 'C' },
+      { key: 'extraversion',      label: 'E', cls: 'E' },
+      { key: 'agreeableness',     label: 'A', cls: 'A' },
+      { key: 'neuroticism',       label: 'N', cls: 'N' },
+    ];
+
+    return `
+      <div class="ocean-section">
+        <div class="ocean-label">OCEAN Personality</div>
+        <div class="ocean-bars" role="list" aria-label="OCEAN personality scores">
+          ${traits.map(t => {
+            const val = ocean?.[t.key] ?? 5;
+            const pct = (val / 10) * 100;
+            return `
+              <div class="ocean-row" role="listitem">
+                <span class="ocean-trait-name" title="${t.key}" aria-label="${t.key}">${t.label}</span>
+                <div class="ocean-track" aria-hidden="true">
+                  <div class="ocean-fill ${t.cls}" style="width:${pct}%"></div>
+                </div>
+                <span class="ocean-val" aria-label="${val} out of 10">${val}</span>
+              </div>`;
+          }).join('')}
+        </div>
+      </div>`;
+  }
+
+  /* ── Agent card renderer ───────────────────────────────────────────── */
+  function renderAgentCard(agent, result) {
+    const hasVote = result && result.vote;
+    const voteClass = !hasVote ? '' :
+                      result.vote === 'Yes' ? 'voted-yes' : 'voted-no';
+
+    const voteBadge = !hasVote ? '' : `
+      <span class="vote-badge ${result.vote === 'Yes' ? 'yes' : result.vote === 'No' ? 'no' : 'null'}"
+            aria-label="Voted ${result.vote}">
+        ${result.vote === 'Yes' ? '&#10003;' : result.vote === 'No' ? '&#10007;' : '?'}
+        ${result.vote ?? 'N/A'}
+      </span>`;
+
+    const reasonHtml = (hasVote && result.reason && result.reason !== 'parse_error') ? `
+      <div class="card-reason" aria-label="Vote reason">
+        &ldquo;${escHtml(result.reason)}&rdquo;
+      </div>` : '';
+
+    const incomeTag = agent.household_income_bracket
+      ? `<span class="tag" aria-label="Household income ${escHtml(agent.household_income_bracket)}">${escHtml(agent.household_income_bracket)}</span>`
+      : '';
+
+    const tenureTag = agent.tenure
+      ? `<span class="tag ${agent.tenure.toLowerCase()}" aria-label="Tenure: ${escHtml(agent.tenure)}">${escHtml(agent.tenure)}</span>`
+      : '';
+
+    return `
+      <article class="agent-card ${voteClass}" role="listitem" aria-label="Agent: ${escHtml(agent.name)}">
+        <div class="card-header">
+          <div>
+            <div class="card-name">${escHtml(agent.name)}</div>
+            <div class="card-age">Age ${agent.age} &bull; ${escHtml(agent.sex)}</div>
+          </div>
+          ${voteBadge}
+        </div>
+
+        <div class="card-meta">
+          <div class="card-meta-row">
+            <span class="meta-icon" aria-hidden="true">&#128205;</span>
+            <span class="meta-label">${escHtml(agent.neighborhood)}</span>
+          </div>
+          <div class="card-meta-row">
+            <span class="meta-icon" aria-hidden="true">&#128188;</span>
+            <span>${escHtml(agent.occupation)}</span>
+          </div>
+          <div class="card-meta-row">
+            <span class="meta-icon" aria-hidden="true">&#128181;</span>
+            <span>${agent.income_annual != null ? '$' + agent.income_annual.toLocaleString() + '/yr' : 'N/A'}</span>
+          </div>
+        </div>
+
+        <div class="card-tags">
+          ${incomeTag}
+          ${tenureTag}
+          <span class="tag" aria-label="Race/ethnicity: ${escHtml(agent.race_ethnicity)}">${escHtml(agent.race_ethnicity)}</span>
+        </div>
+
+        ${renderOceanBars(agent.ocean)}
+
+        ${reasonHtml}
+      </article>`;
+  }
+
+  /* ── Render agent grid ─────────────────────────────────────────────── */
+  function renderAgents() {
+    if (!agents.length) {
+      agentGrid.innerHTML = '';
+      agentGrid.appendChild(agentsEmpty);
+      agentsEmpty.style.display = '';
+      agentCountLbl.textContent = '';
+      agentFilterWrap.style.display = 'none';
+      return;
+    }
+
+    agentsEmpty.style.display = 'none';
+
+    // Build a lookup map for results by agent id
+    const resultByID = Object.fromEntries(results.map(r => [r.id, r]));
+
+    // The vote filter only makes sense once agents have voted.
+    const hasVotes = results.some(r => r.vote);
+    agentFilterWrap.style.display = hasVotes ? '' : 'none';
+
+    // Apply the selected vote filter.
+    const shown = agents.filter(a => {
+      if (agentFilter === 'all') return true;
+      return (resultByID[a.id]?.vote ?? '').toLowerCase() === agentFilter;
+    });
+
+    agentCountLbl.textContent = shown.length === agents.length
+      ? `${agents.length} agents`
+      : `${shown.length} of ${agents.length} agents`;
+
+    if (!shown.length) {
+      agentGrid.innerHTML =
+        `<div class="empty-state"><p>No agents voted ${agentFilter === 'yes' ? 'Yes' : 'No'}.</p></div>`;
+      return;
+    }
+
+    agentGrid.innerHTML = shown
+      .map(a => renderAgentCard(a, resultByID[a.id] ?? null))
+      .join('');
+  }
+
+  /* ── Vote chart ────────────────────────────────────────────────────── */
+  function renderChart(yesCnt, noCnt) {
+    const ctx = $('vote-chart');
+    if (chartInst) {
+      chartInst.destroy();
+      chartInst = null;
+    }
+    if (!ctx) return;
+    if (typeof Chart === 'undefined') {
+      ctx.parentElement.innerHTML = '<p style="text-align:center;color:var(--text-muted);font-size:.85rem;">Chart unavailable (CDN blocked)</p>';
+      return;
+    }
+
+    chartInst = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: ['Yes', 'No'],
+        datasets: [{
+          data: [yesCnt, noCnt],
+          backgroundColor: ['#2e7d32', '#c62828'],
+          borderColor: ['#fff', '#fff'],
+          borderWidth: 3,
+          hoverOffset: 6,
+        }],
+      },
+      options: {
+        responsive: true,
+        cutout: '62%',
+        plugins: {
+          legend: {
+            position: 'bottom',
+            labels: {
+              padding: 18,
+              font: { size: 13, weight: '600', family: 'Inter, system-ui, sans-serif' },
+              color: '#1a202c',
+            },
+          },
+          tooltip: {
+            callbacks: {
+              label(ctx) {
+                const total = yesCnt + noCnt;
+                const pct = total ? ((ctx.parsed / total) * 100).toFixed(1) : 0;
+                return ` ${ctx.label}: ${ctx.parsed} (${pct}%)`;
+              },
+            },
+          },
+        },
+        animation: {
+          duration: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 800,
+        },
+      },
+    });
+  }
+
+  /* ── Themes renderer ───────────────────────────────────────────────── */
+  function renderThemes(themes, side) {
+    const el = $(side === 'yes' ? 'yes-themes' : 'no-themes');
+    if (!themes || !themes.length) {
+      el.innerHTML = '<p style="font-size:.82rem;color:var(--text-muted);">No themes found.</p>';
+      return;
+    }
+    el.innerHTML = themes.slice(0, 3).map(t => {
+      // Support both tuple format [name, count, agents] and object format {theme, agents}
+      const name = Array.isArray(t) ? t[0] : t.theme;
+      const agentNames = Array.isArray(t) ? (t[2] || []) : (t.agents || []);
+      const count = Array.isArray(t) ? t[1] : agentNames.length;
+      return `
+      <div class="theme-item">
+        <div class="theme-top">
+          <span class="theme-name">${escHtml(name)}</span>
+          <span class="theme-count ${side}">${count} vote${count !== 1 ? 's' : ''}</span>
+        </div>
+        <div class="theme-agents">${escHtml(agentNames.join(', '))}</div>
+      </div>`;
+    }).join('');
+  }
+
+  /* ── Most interesting ──────────────────────────────────────────────── */
+  function renderInteresting(most) {
+    if (!most) {
+      interestingCard.style.display = 'none';
+      return;
+    }
+    interestingCard.style.display = '';
+
+    $('interesting-meta').innerHTML = [
+      { label: 'Name',         value: most.name },
+      { label: 'Age',          value: most.age },
+      { label: 'Neighborhood', value: most.neighborhood },
+      { label: 'Occupation',   value: most.occupation },
+      { label: 'Vote',         value: most.vote },
+    ].map(({ label, value }) => `
+      <span class="imeta"><span>${label}:</span> <strong>${escHtml(String(value ?? '—'))}</strong></span>
+    `).join('');
+
+    $('interesting-quote').textContent = most.reason ?? '';
+  }
+
+  /* ── Results section ───────────────────────────────────────────────── */
+  function renderResults() {
+    if (!summary) return;
+
+    resultsSection.classList.add('visible');
+
+    // Tally numbers
+    $('tally-yes').textContent   = summary.yes_count  ?? 0;
+    $('tally-no').textContent    = summary.no_count   ?? 0;
+    $('tally-total').textContent = (summary.yes_count + summary.no_count + (summary.null_count ?? 0));
+    $('tally-yes-pct').textContent = summary.yes_pct != null ? `${Number(summary.yes_pct).toFixed(1)}%` : '';
+    $('tally-no-pct').textContent  = summary.no_pct  != null ? `${Number(summary.no_pct).toFixed(1)}%`  : '';
+    $('tally-null-info').textContent = summary.null_count
+      ? `${summary.null_count} parse error${summary.null_count !== 1 ? 's' : ''}`
+      : 'All votes parsed';
+
+    renderChart(summary.yes_count ?? 0, summary.no_count ?? 0);
+    renderThemes(summary.yes_themes, 'yes');
+    renderThemes(summary.no_themes, 'no');
+    renderInteresting(summary.most_interesting ?? null);
+  }
+
+  /* ── Filter interactivity ──────────────────────────────────────────── */
+  // Toggle the active state within one filter button group.
+  function activateFilterBtn(group, btn, value) {
+    group.querySelectorAll('.filter-btn').forEach(b => {
+      b.classList.remove('active', 'active-yes', 'active-no');
+      b.setAttribute('aria-pressed', 'false');
+    });
+    btn.classList.add(value === 'yes' ? 'active-yes' : value === 'no' ? 'active-no' : 'active');
+    btn.setAttribute('aria-pressed', 'true');
+  }
+
+  // Agent Population grid filter buttons.
+  agentFilterWrap.querySelectorAll('.filter-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      agentFilter = btn.dataset.filter;
+      activateFilterBtn(agentFilterWrap, btn, agentFilter);
+      renderAgents();
+    });
+  });
+
+  // Collapse / expand the Agent Population section.
+  const agentsSection = $('agents-section');
+  const agentsToggle  = $('agents-toggle');
+  agentsToggle.addEventListener('click', () => {
+    const collapsed = agentsSection.classList.toggle('collapsed');
+    agentsToggle.setAttribute('aria-expanded', String(!collapsed));
+  });
+
+  /* ── Generate population ───────────────────────────────────────────── */
+  btnGenerate.addEventListener('click', async () => {
+    hideError();
+    setLoading(btnGenerate, true);
+    try {
+      const seed = parseInt(seedInput.value, 10) || 42;
+      const data = await apiFetch(`/api/generate?seed=${seed}`, {
+        method: 'POST',
+      });
+      agents  = data.agents ?? [];
+      results = [];
+      summary = null;
+      btnVote.disabled = agents.length === 0;
+      btnVote.style.display = '';
+      btnRevote.style.display = 'none';
+      btnRevote.disabled = true;
+      statusText.innerHTML = `<span class="status-count">${agents.length}</span> agents loaded`;
+      resultsSection.classList.remove('visible');
+      progressWrap.classList.remove('visible');
+      renderAgents();
+    } catch (err) {
+      showError(`Generate failed: ${err.message}`);
+    } finally {
+      setLoading(btnGenerate, false);
+    }
+  });
+
+  /* ── Run vote ──────────────────────────────────────────────────────── */
+  btnVote.addEventListener('click', async () => {
+    hideError();
+    setLoading(btnVote, true);
+    btnGenerate.disabled = true;
+
+    // Show results section with progress bar before we have data
+    resultsSection.classList.add('visible');
+    progressWrap.classList.add('visible');
+    setProgress(0, 'Running vote — calling LLM for each agent\u2026');
+
+    try {
+      const data = await apiFetch('/api/vote', {
+        method: 'POST',
+        body: JSON.stringify({ question: getQuestion() }),
+      });
+      results = data.results ?? [];
+      summary = data.summary ?? null;
+
+      setProgress(100, 'Vote complete');
+      setTimeout(() => progressWrap.classList.remove('visible'), 1200);
+
+      renderAgents();   // re-render cards with votes
+      renderResults();
+
+      statusText.innerHTML = summary
+        ? `Vote complete &mdash; <span class="status-count">${summary.yes_count} Yes</span> / <span class="status-count">${summary.no_count} No</span>`
+        : 'Vote complete';
+
+      // Scroll results into view
+      resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+      // Show re-vote button, hide initial vote button
+      btnVote.style.display = 'none';
+      btnRevote.style.display = '';
+      btnRevote.disabled = false;
+    } catch (err) {
+      showError(`Vote failed: ${err.message}`);
+      progressWrap.classList.remove('visible');
+    } finally {
+      setLoading(btnVote, false);
+      btnGenerate.disabled = false;
+    }
+  });
+
+  /* ── Re-vote (fresh, non-deterministic) ──────────────────────────── */
+  btnRevote.addEventListener('click', async () => {
+    hideError();
+    setLoading(btnRevote, true);
+    btnGenerate.disabled = true;
+
+    resultsSection.classList.add('visible');
+    progressWrap.classList.add('visible');
+    setProgress(0, 'Re-voting — same people, fresh reasoning\u2026');
+
+    try {
+      const data = await apiFetch('/api/vote?fresh=true', {
+        method: 'POST',
+        body: JSON.stringify({ question: getQuestion() }),
+      });
+      results = data.results ?? [];
+      summary = data.summary ?? null;
+
+      setProgress(100, 'Re-vote complete');
+      setTimeout(() => progressWrap.classList.remove('visible'), 1200);
+
+      renderAgents();
+      renderResults();
+
+      statusText.innerHTML = summary
+        ? `Re-vote complete &mdash; <span class="status-count">${summary.yes_count} Yes</span> / <span class="status-count">${summary.no_count} No</span>`
+        : 'Re-vote complete';
+
+      resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } catch (err) {
+      showError(`Re-vote failed: ${err.message}`);
+      progressWrap.classList.remove('visible');
+    } finally {
+      setLoading(btnRevote, false);
+      btnGenerate.disabled = false;
+    }
+  });
+
+  function setProgress(pct, label) {
+    progressFill.style.width = `${pct}%`;
+    progressLabel.textContent = label;
+    progressPct.textContent   = `${Math.round(pct)}%`;
+    progressAria.setAttribute('aria-valuenow', Math.round(pct));
+  }
+
+  /* ── Ballot question ───────────────────────────────────────────────── */
+  // The trimmed question to send with a vote; falls back to the default.
+  function getQuestion() {
+    const q = questionInput.value.trim();
+    return q || defaultQuestion;
+  }
+
+  // Enable "Reset to default" only when the field diverges from the default.
+  function syncResetButton() {
+    btnResetQ.disabled = questionInput.value.trim() === defaultQuestion.trim();
+  }
+
+  questionInput.addEventListener('input', syncResetButton);
+  btnResetQ.addEventListener('click', () => {
+    questionInput.value = defaultQuestion;
+    syncResetButton();
+    questionInput.focus();
+  });
+
+  /* ── Bootstrap: load existing data on page load ────────────────────── */
+  async function bootstrap() {
+    let agentsOK  = false;
+    let resultsOK = false;
+
+    // Load the default ballot question and prefill the input.
+    try {
+      const config = await apiFetch('/api/config');
+      defaultQuestion = config.default_question ?? '';
+      if (!questionInput.value.trim()) {
+        questionInput.value = defaultQuestion;
+      }
+      syncResetButton();
+    } catch (_) { /* keep placeholder if config unavailable */ }
+
+    try {
+      const agentData = await apiFetch('/api/agents');
+      if (agentData.agents && agentData.agents.length) {
+        agents = agentData.agents;
+        agentsOK = true;
+      }
+    } catch (_) { /* no agents yet — silently skip */ }
+
+    try {
+      const resultData = await apiFetch('/api/results');
+      if (resultData.results && resultData.results.length) {
+        results = resultData.results;
+        summary = resultData.summary ?? null;
+        resultsOK = true;
+      }
+    } catch (_) { /* no results yet — silently skip */ }
+
+    // Update UI — wrapped in try-catch so loader always clears
+    try {
+      renderAgents();
+      if (agents.length) {
+        btnVote.disabled = false;
+        statusText.innerHTML = `<span class="status-count">${agents.length}</span> agents loaded`;
+      }
+      if (resultsOK && summary) {
+        renderResults();
+        statusText.innerHTML = summary
+          ? `Vote complete &mdash; <span class="status-count">${summary.yes_count} Yes</span> / <span class="status-count">${summary.no_count} No</span>`
+          : statusText.innerHTML;
+        // Show re-vote, hide initial vote
+        btnVote.style.display = 'none';
+        btnRevote.style.display = '';
+        btnRevote.disabled = false;
+      }
+    } catch (err) {
+      console.error('Bootstrap render error:', err);
+    }
+
+    // Remove page loader
+    pageLoader.classList.add('fade-out');
+    setTimeout(() => pageLoader.remove(), 350);
+  }
+
+  /* ── Utility: HTML escaping ────────────────────────────────────────── */
+  function escHtml(str) {
+    if (str == null) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#x27;');
+  }
+
+  /* ── Start ─────────────────────────────────────────────────────────── */
+  bootstrap();
+  </script>
+</body>
+</html>
