@@ -37,7 +37,6 @@ def _make_record(**kwargs) -> dict:
     defaults = {
         "AGEP": "30",
         "OCCP": "5300",  # Customer Service Rep — not a SWE
-        "PINCP": "60000",
         "HINCP": "80000",
         "TEN": "3",
         "RAC1P": "1",
@@ -54,9 +53,9 @@ def _make_record(**kwargs) -> dict:
 # REQ-005: PUMA neighborhood mapping
 # ---------------------------------------------------------------------------
 class TestPumaNeighborhoods:
-    def test_all_seven_pumas_present(self):
-        """REQ-005: All seven SF PUMAs must be mapped."""
-        expected = {f"0750{i}" for i in range(1, 8)}
+    def test_all_sf_pumas_present(self):
+        """REQ-005: All SF 2020 PUMAs (07507-07514) must be mapped."""
+        expected = {f"075{i:02d}" for i in range(7, 15)}
         assert set(PUMA_NEIGHBORHOODS.keys()) == expected
 
     def test_each_puma_has_multiple_neighborhoods(self):
@@ -161,33 +160,33 @@ class TestNameGeneration:
 class TestOceanDerivation:
     def test_all_five_traits_present(self):
         """REQ-008: OCEAN dict must contain all 5 traits."""
-        ocean = _derive_ocean(1, 25, "1", 50000, "Renter", "Software Engineer")
+        ocean = _derive_ocean(1, 25, "1", 90000, "Renter", "Software Engineer")
         assert set(ocean.keys()) == {"openness", "conscientiousness", "extraversion", "agreeableness", "neuroticism"}
 
     def test_scores_clamped_to_range(self):
         """REQ-008: All scores must be in [1.0, 10.0]."""
         # Extreme cases
         for agent_id in range(1, 50):
-            ocean = _derive_ocean(agent_id, 18, "2", 200000, "Owner", "Software Engineer")
+            ocean = _derive_ocean(agent_id, 18, "2", 250000, "Owner", "Software Engineer")
             for trait, val in ocean.items():
                 assert 1.0 <= val <= 10.0, f"Trait {trait}={val} out of range for agent {agent_id}"
 
     def test_demographics_are_primary_signal(self):
         """REQ-008: Demographic differences should produce systematically different means."""
         # Young (age<30) should score higher on openness than old (age>50) on average
-        young_openness = [_derive_ocean(i, 22, "1", 50000, "Renter", "Clerk")["openness"] for i in range(1, 20)]
-        old_openness = [_derive_ocean(i, 60, "1", 50000, "Owner", "Clerk")["openness"] for i in range(1, 20)]
+        young_openness = [_derive_ocean(i, 22, "1", 60000, "Renter", "Clerk")["openness"] for i in range(1, 20)]
+        old_openness = [_derive_ocean(i, 60, "1", 60000, "Owner", "Clerk")["openness"] for i in range(1, 20)]
         assert sum(young_openness) / len(young_openness) > sum(old_openness) / len(old_openness)
 
     def test_reproducible_per_agent(self):
         """REQ-008: Same agent_id + same demographics = same OCEAN."""
-        o1 = _derive_ocean(7, 35, "2", 70000, "Renter", "Nurse")
-        o2 = _derive_ocean(7, 35, "2", 70000, "Renter", "Nurse")
+        o1 = _derive_ocean(7, 35, "2", 90000, "Renter", "Nurse")
+        o2 = _derive_ocean(7, 35, "2", 90000, "Renter", "Nurse")
         assert o1 == o2
 
     def test_scores_are_floats_rounded_to_one_decimal(self):
         """REQ-008: Scores should be floats with at most 1 decimal place."""
-        ocean = _derive_ocean(3, 40, "1", 80000, "Renter", "Teacher")
+        ocean = _derive_ocean(3, 40, "1", 100000, "Renter", "Teacher")
         for trait, val in ocean.items():
             assert isinstance(val, float)
             assert round(val, 1) == val
@@ -204,7 +203,7 @@ class TestProfileGeneration:
     def test_profile_is_two_sentences(self):
         """REQ-009: Profile must be exactly 2 sentences."""
         ocean = self._make_ocean()
-        profile = _build_profile("Jane Smith", 30, "Teacher", "Mission", 60000, 90000, "Renter", ocean)
+        profile = _build_profile("Jane Smith", 30, "Teacher", "Mission", 90000, "Renter", ocean)
         # Count sentence-ending punctuation
         sentences = [s.strip() for s in profile.split(".") if s.strip()]
         assert len(sentences) >= 2
@@ -212,19 +211,19 @@ class TestProfileGeneration:
     def test_profile_contains_name(self):
         """REQ-009: Profile should contain the agent's first name."""
         ocean = self._make_ocean()
-        profile = _build_profile("John Doe", 28, "Chef", "SoMa", 40000, 55000, "Renter", ocean)
+        profile = _build_profile("John Doe", 28, "Chef", "SoMa", 55000, "Renter", ocean)
         assert "John" in profile
 
     def test_profile_contains_neighborhood(self):
         """REQ-009: Profile should mention the neighborhood."""
         ocean = self._make_ocean()
-        profile = _build_profile("Ana Lopez", 45, "Nurse", "Castro", 95000, 110000, "Owner", ocean)
+        profile = _build_profile("Ana Lopez", 45, "Nurse", "Castro", 110000, "Owner", ocean)
         assert "Castro" in profile
 
     def test_profile_is_third_person(self):
         """REQ-009: Profile should use third-person pronouns."""
         ocean = self._make_ocean()
-        profile = _build_profile("Carlos Reyes", 55, "Lawyer", "Noe Valley", 180000, 200000, "Owner", ocean)
+        profile = _build_profile("Carlos Reyes", 55, "Lawyer", "Noe Valley", 200000, "Owner", ocean)
         # Should not start with "I" — must be third-person
         assert not profile.startswith("I ")
         assert "Carlos" in profile or "They" in profile
@@ -304,7 +303,6 @@ class TestGenerateIntegration:
             records.append({
                 "AGEP": str(rng.randint(18, 65)),
                 "OCCP": rng.choice(occp_pool),
-                "PINCP": str(rng.randint(20000, 200000)),
                 "HINCP": str(rng.randint(30000, 250000)),
                 "TEN": str(rng.randint(1, 4)),
                 "RAC1P": str(rng.randint(1, 9)),
@@ -361,7 +359,7 @@ class TestGenerateIntegration:
         """REQ-010: All required fields must be present in each agent."""
         required = {
             "id", "name", "age", "sex", "race_ethnicity", "neighborhood",
-            "occupation", "income_annual", "household_income",
+            "occupation", "household_income",
             "household_income_bracket", "tenure", "ocean", "profile",
         }
         fake_records = self._make_fake_records(200)
@@ -418,3 +416,118 @@ class TestGenerateIntegration:
         for agent in agents:
             assert agent["household_income_bracket"] in valid_brackets, \
                 f"Invalid bracket: {agent['household_income_bracket']}"
+
+
+# ---------------------------------------------------------------------------
+# Agent memory — 3 past delivery-app experiences (optional, LLM-backed)
+# ---------------------------------------------------------------------------
+def _mock_openai_client(experiences):
+    """A MagicMock OpenAI client whose completion returns the given experiences."""
+    client = MagicMock()
+    message = MagicMock()
+    message.content = json.dumps({"experiences": experiences})
+    client.chat.completions.create.return_value = MagicMock(
+        choices=[MagicMock(message=message)]
+    )
+    return client
+
+
+class TestParseExperiences:
+    def test_valid_three_item_list(self):
+        from generate_population import _parse_experiences
+        content = json.dumps({"experiences": ["a", "b", "c"]})
+        assert _parse_experiences(content) == ["a", "b", "c"]
+
+    def test_strips_whitespace(self):
+        from generate_population import _parse_experiences
+        content = json.dumps({"experiences": ["  a ", "b", "c "]})
+        assert _parse_experiences(content) == ["a", "b", "c"]
+
+    def test_wrong_count_returns_empty(self):
+        from generate_population import _parse_experiences
+        assert _parse_experiences(json.dumps({"experiences": ["a", "b"]})) == []
+
+    def test_empty_string_item_returns_empty(self):
+        from generate_population import _parse_experiences
+        assert _parse_experiences(json.dumps({"experiences": ["a", "", "c"]})) == []
+
+    def test_malformed_json_returns_empty(self):
+        from generate_population import _parse_experiences
+        assert _parse_experiences("not json") == []
+
+    def test_missing_key_returns_empty(self):
+        from generate_population import _parse_experiences
+        assert _parse_experiences(json.dumps({"foo": "bar"})) == []
+
+
+class TestGenerateDeliveryExperiences:
+    def _agent(self):
+        return {
+            "id": 1, "name": "Test Person", "age": 34, "sex": "Female",
+            "race_ethnicity": "Asian", "neighborhood": "Mission",
+            "occupation": "Software Developer", "household_income": 150000,
+            "tenure": "Renter", "profile": "A curious 34-year-old.",
+        }
+
+    def test_returns_three_experiences(self):
+        from generate_population import _generate_delivery_experiences
+        client = _mock_openai_client(["exp1", "exp2", "exp3"])
+        result = _generate_delivery_experiences(self._agent(), client)
+        assert result == ["exp1", "exp2", "exp3"]
+
+    def test_uses_developer_role_and_o4_mini(self):
+        """o4-mini rules: developer role (not system), no temperature param."""
+        from generate_population import _generate_delivery_experiences, MEMORY_MODEL
+        client = _mock_openai_client(["exp1", "exp2", "exp3"])
+        _generate_delivery_experiences(self._agent(), client)
+        kwargs = client.chat.completions.create.call_args.kwargs
+        assert kwargs["model"] == MEMORY_MODEL
+        assert "temperature" not in kwargs
+        roles = [m["role"] for m in kwargs["messages"]]
+        assert "developer" in roles and "system" not in roles
+
+    def test_retries_then_returns_empty_on_persistent_failure(self):
+        from generate_population import _generate_delivery_experiences
+        client = _mock_openai_client(["only", "two"])  # invalid every time
+        result = _generate_delivery_experiences(self._agent(), client)
+        assert result == []
+        assert client.chat.completions.create.call_count == 2
+
+    def test_api_exception_is_swallowed(self):
+        from generate_population import _generate_delivery_experiences
+        client = MagicMock()
+        client.chat.completions.create.side_effect = RuntimeError("boom")
+        assert _generate_delivery_experiences(self._agent(), client) == []
+
+
+class TestGenerateWithMemory:
+    def _make_fake_records(self, n=200):
+        return TestGenerateIntegration()._make_fake_records(n)
+
+    def test_no_memory_by_default(self):
+        """Without use_memory, agents have no delivery_experiences key."""
+        fake_records = self._make_fake_records()
+        for r in fake_records:
+            r["OCCP"] = "5300"
+        with patch("generate_population._fetch_pums", return_value=fake_records):
+            from generate_population import generate
+            agents = generate(seed=42)
+        assert all("delivery_experiences" not in a for a in agents)
+
+    def test_use_memory_attaches_three_experiences(self):
+        fake_records = self._make_fake_records()
+        for r in fake_records:
+            r["OCCP"] = "5300"
+        client = _mock_openai_client(["exp1", "exp2", "exp3"])
+        with patch("generate_population._fetch_pums", return_value=fake_records), \
+             patch("openai.OpenAI", return_value=client), \
+             patch.dict("os.environ", {"OPENAI_API_KEY": "test-key"}):
+            from generate_population import generate
+            agents = generate(seed=42, use_memory=True)
+        assert all(a["delivery_experiences"] == ["exp1", "exp2", "exp3"] for a in agents)
+
+    def test_use_memory_requires_api_key(self):
+        from generate_population import _attach_delivery_experiences
+        with patch.dict("os.environ", {}, clear=True):
+            with pytest.raises(RuntimeError, match="OPENAI_API_KEY"):
+                _attach_delivery_experiences([{"id": 1}])

@@ -8,32 +8,38 @@ results/agents.json.
 
 REQ-001 through REQ-013.
 
-OCEAN Demographic Adjustment Table
-------------------------------------
-All traits start at base 5.5. Adjustments below are additive and stack.
-Demographics are the PRIMARY signal; noise (gauss 0, 0.4) is SECONDARY.
+OCEAN Demographic Derivation (REQ-008)
+--------------------------------------
+Scores are DERIVED from demographic correlates, not assigned randomly. Each
+trait = base 5.5 + Σ(demographic terms) + small individual noise. Demographics
+are the PRIMARY, dominant signal; noise (gauss 0, 0.7) adds within-group variety
+so two similar residents are not identical. Directions and relative magnitudes
+follow the personality-psychology literature (age "maturity principle", sex
+differences in N/A, SES, occupational selection).
 
-Condition                  |  O    |  C    |  E    |  A    |  N    | Rationale
----------------------------|-------|-------|-------|-------|-------|----------
-Age < 30                   | +0.7  | -0.5  | +0.6  | -0.3  | +0.5  | Youth: higher O/E, lower C
-Age 30-50                  |  0    | +0.3  |  0    | +0.2  |  0    | Mid-life: settling, more A/C
-Age > 50                   | -0.4  | +0.6  | -0.4  | +0.5  | -0.5  | Maturity: higher C/A, lower N/O/E
-Sex = Female               | +0.2  | +0.2  | +0.2  | +0.5  | +0.5  | Population-level tendencies in A and N
-Sex = Male                 |  0    |  0    |  0    | -0.2  | -0.3  | Slight inverse of female adjustments
-Income > $150k             | +0.4  | +0.6  | +0.4  |  0    | -0.4  | High earners: conscientious, open, lower anxiety
-Income < $30k              | -0.2  | -0.2  | -0.2  | +0.2  | +0.6  | Economic stress: higher neuroticism
-Tenure = Own               |  0    | +0.4  |  0    |  0    | -0.3  | Stability correlates with C, lower N
-Tenure = Rent              | +0.2  | -0.2  | +0.2  |  0    | +0.2  | Flexibility, slightly higher openness
-Tech/creative occupation   | +0.8  | +0.3  |  0    | -0.2  |  0    | Tech/creative: high openness
-Service/food occupation    |  0    |  0    | +0.5  | +0.6  | +0.2  | Service: high extraversion/agreeableness
-Healthcare occupation      |  0    | +0.6  | +0.2  | +0.7  |  0    | Healthcare: high C/A
-Arts/media occupation      | +1.0  | -0.3  | +0.3  |  0    | +0.3  | Artists: very high openness
-Education occupation       | +0.3  | +0.4  | +0.3  | +0.5  |  0    | Teachers: agreeable, conscientious
+Age is CONTINUOUS via age_factor = (age - 45) / 17 (~ -1.4 young to +2.0 old):
+  O -0.5  C +0.7  E -0.3  A +0.6  N -0.7  per unit  (older = more C/A, less N/O/E)
+Household income is CONTINUOUS via ses = (log10(household_income) - 5.08) / 0.5,
+floored at $15k. Pivot 5.08 ~ $120k ~ SF median household income, so ses=0 is a
+typical SF household:
+  O +0.3  C +0.5  E +0.3  A -0.1  N -0.5  per unit  (higher SES = more C, less N)
+Sex = Female: N +0.9  A +0.6  C +0.2  O +0.1   Male: N -0.4  A -0.2
+Tenure = Own:  C +0.4  A +0.2  N -0.4          Rent: O +0.2  C -0.2  E +0.2  N +0.3
+Occupation category (broad keyword match; every worker gets a signal):
+  tech/engineering  O +0.8  C +0.4  E -0.2  A -0.2
+  healthcare        C +0.6  E +0.2  A +0.8
+  arts/media        O +1.2  C -0.3  E +0.3  N +0.3
+  education         O +0.4  C +0.5  E +0.2  A +0.6
+  business/mgmt     O +0.2  C +0.6  E +0.5  A -0.2  N -0.2
+  service/food      C -0.1  E +0.4  A +0.5  N +0.2
+  office/admin      C +0.4  E -0.2
+  (not in labor force / unmatched: no occupation term)
 """
 
 import argparse
 import csv
 import json
+import math
 import os
 import random
 import sys
@@ -54,6 +60,18 @@ CACHE_PATH = DATA_DIR / "pums_sf.csv"
 DEFAULT_OUTPUT = RESULTS_DIR / "agents.json"
 
 # ---------------------------------------------------------------------------
+# Agent-memory (delivery-app experiences) — optional, LLM-backed
+# ---------------------------------------------------------------------------
+# Population generation is LLM-free by default. The ONLY path that calls the
+# LLM is the optional agent-memory feature (use_memory=True), which asks
+# o4-mini for 3 realistic past food-delivery-app experiences per agent. The
+# experiences become part of the persona at vote time (run_scenario.py) and so
+# influence how the agent votes. Concurrency mirrors run_scenario.py.
+MEMORY_MODEL = "o4-mini"
+MAX_CONCURRENCY = int(os.environ.get("MAX_CONCURRENCY", "10"))
+DELIVERY_EXPERIENCE_COUNT = 3
+
+# ---------------------------------------------------------------------------
 # Census API — REQ-001
 # ---------------------------------------------------------------------------
 CENSUS_URL = "https://api.census.gov/data/2022/acs/acs5/pums"
@@ -63,7 +81,7 @@ _census_key = os.environ.get("CENSUS_API_KEY", "")
 # 2020 PUMA codes for San Francisco County (FIPS 06075)
 SF_PUMAS = {"07507", "07508", "07509", "07510", "07511", "07512", "07513", "07514"}
 CENSUS_PARAMS = {
-    "get": "AGEP,OCCP,PINCP,HINCP,TEN,RAC1P,HISP,SEX,PWGTP,PUMA20",
+    "get": "AGEP,OCCP,HINCP,TEN,RAC1P,HISP,SEX,PWGTP,PUMA20",
     "for": "state:06",
     **({"key": _census_key} if _census_key else {}),
 }
@@ -664,79 +682,106 @@ def _income_bracket(hincp: int) -> str:
     return ">$120k"
 
 
+# Occupation category -> (O, C, E, A, N) adjustments. Checked in order, first
+# match wins, so more specific categories (tech, healthcare) precede broader
+# ones (business, office). Keywords cover both specific titles and the broad
+# group labels the OCCP lookup emits (e.g. "Management", "Office/Admin").
+_OCC_CATEGORIES = (
+    ("tech/engineering",
+     ("software", "developer", "engineer", "computer", "data", "analyst", "web",
+      "network", "database", "systems", "aerospace", "programmer", "scientist"),
+     (0.8, 0.4, -0.2, -0.2, 0.0)),
+    ("healthcare",
+     ("nurse", "doctor", "physician", "pharmacist", "therapist", "surgeon",
+      "paramedic", "dentist", "medical", "health", "clinical", "phlebotomist"),
+     (0.0, 0.6, 0.2, 0.8, 0.0)),
+    ("arts/media",
+     ("artist", "musician", "photographer", "actor", "dancer", "designer",
+      "writer", "editor", "reporter", "producer", "director", "media", "arts"),
+     (1.2, -0.3, 0.3, 0.0, 0.3)),
+    ("education",
+     ("teacher", "professor", "instructor", "librarian", "education", "tutor",
+      "teaching", "school"),
+     (0.4, 0.5, 0.2, 0.6, 0.0)),
+    ("business/mgmt",
+     ("management", "manager", "business", "finance", "financial", "sales agent",
+      "executive", "accountant", "marketing", "consultant"),
+     (0.2, 0.6, 0.5, -0.2, -0.2)),
+    ("service/food",
+     ("food", "waiter", "server", "bartender", "barista", "chef", "baker",
+      "cashier", "counter", "dishwasher", "personal care", "clerk", "retail"),
+     (0.0, -0.1, 0.4, 0.5, 0.2)),
+    ("office/admin",
+     ("office", "admin", "operator", "station", "clerical", "receptionist"),
+     (0.0, 0.4, -0.2, 0.0, 0.0)),
+)
+
+
 def _derive_ocean(
     agent_id: int,
     age: int,
     sex_code: str,
-    income: int,
+    household_income: int,
     tenure: str,
     occupation: str,
 ) -> dict:
     """
-    Compute OCEAN scores. Demographics are the PRIMARY signal; noise is secondary.
-    See module-level docstring for the full adjustment table. REQ-008.
+    Derive OCEAN scores from demographic correlates (REQ-008). Demographics are
+    the PRIMARY, dominant signal; a small per-agent noise term adds within-group
+    variety. Age and household income act continuously; sex, tenure, and
+    occupation-category act as signed terms. See the module docstring for
+    coefficients and rationale.
     """
     BASE = 5.5
-    # Start with base values
-    o, c, e, a, n = BASE, BASE, BASE, BASE, BASE
+    o = c = e = a = n = BASE
 
-    # Age adjustments
-    if age < 30:
-        o += 0.7; c -= 0.5; e += 0.6; a -= 0.3; n += 0.5
-    elif age <= 50:
-        c += 0.3; a += 0.2
-    else:
-        o -= 0.4; c += 0.6; e -= 0.4; a += 0.5; n -= 0.5
+    # Age — continuous "maturity principle" (older => more C/A, less N/O/E).
+    age_factor = (age - 45) / 17.0
+    o += -0.5 * age_factor
+    c += 0.7 * age_factor
+    e += -0.3 * age_factor
+    a += 0.6 * age_factor
+    n += -0.7 * age_factor
 
-    # Sex adjustments
+    # Sex — replicated population differences in Neuroticism and Agreeableness.
     if str(sex_code) == "2":  # Female
-        o += 0.2; c += 0.2; e += 0.2; a += 0.5; n += 0.5
+        o += 0.1; c += 0.2; a += 0.6; n += 0.9
     else:  # Male
-        a -= 0.2; n -= 0.3
+        a -= 0.2; n -= 0.4
 
-    # Income adjustments
-    if income > 150_000:
-        o += 0.4; c += 0.6; e += 0.4; n -= 0.4
-    elif income < 30_000:
-        o -= 0.2; c -= 0.2; e -= 0.2; a += 0.2; n += 0.6
+    # Household income — continuous SES on a log scale. Pivot 5.08 ~ $120k,
+    # near SF's median household income, so ses=0 is a typical SF household.
+    effective_income = max(household_income, 15_000)
+    ses = (math.log10(effective_income) - 5.08) / 0.5
+    ses = max(-1.5, min(1.8, ses))
+    o += 0.3 * ses
+    c += 0.5 * ses
+    e += 0.3 * ses
+    a += -0.1 * ses
+    n += -0.5 * ses
 
-    # Tenure adjustments
+    # Tenure — ownership correlates with stability (higher C, lower N).
     if tenure == "Owner":
-        c += 0.4; n -= 0.3
+        c += 0.4; a += 0.2; n -= 0.4
     else:
-        o += 0.2; c -= 0.2; e += 0.2; n += 0.2
+        o += 0.2; c -= 0.2; e += 0.2; n += 0.3
 
-    # Occupation adjustments
+    # Occupation category — every worker gets a signal; unmatched titles and
+    # "not in labor force" contribute nothing.
     occ_lower = occupation.lower()
-    tech_creative_keywords = ("software", "developer", "engineer", "computer", "data", "analyst",
-                               "web", "network", "database", "security", "it manager", "systems")
-    service_food_keywords = ("food", "waiter", "server", "bartender", "barista", "chef", "baker",
-                              "cashier", "counter", "dishwasher")
-    healthcare_keywords = ("nurse", "doctor", "physician", "pharmacist", "therapist", "surgeon",
-                            "paramedic", "dentist", "medical", "healthcare", "clinical", "health aide")
-    arts_media_keywords = ("artist", "musician", "photographer", "actor", "dancer", "designer",
-                            "writer", "editor", "reporter", "producer", "director", "media", "arts")
-    education_keywords = ("teacher", "professor", "instructor", "librarian", "education", "tutor",
-                           "postsecondary", "elementary", "school", "teaching assistant")
+    for _label, keywords, (do, dc, de, da, dn) in _OCC_CATEGORIES:
+        if any(k in occ_lower for k in keywords):
+            o += do; c += dc; e += de; a += da; n += dn
+            break
 
-    if any(k in occ_lower for k in tech_creative_keywords):
-        o += 0.8; c += 0.3; a -= 0.2
-    elif any(k in occ_lower for k in arts_media_keywords):
-        o += 1.0; c -= 0.3; e += 0.3; n += 0.3
-    elif any(k in occ_lower for k in healthcare_keywords):
-        c += 0.6; e += 0.2; a += 0.7
-    elif any(k in occ_lower for k in education_keywords):
-        o += 0.3; c += 0.4; e += 0.3; a += 0.5
-    elif any(k in occ_lower for k in service_food_keywords):
-        e += 0.5; a += 0.6; n += 0.2
-
-    # Per-agent noise — minor individual variation (REQ-008)
+    # Per-agent noise — within-group individual variation (secondary to
+    # demographics). Deterministic per agent for reproducibility.
     rng = random.Random(f"{agent_id}_ocean")
-    o += rng.gauss(0, 0.4)
-    c += rng.gauss(0, 0.4)
-    e += rng.gauss(0, 0.4)
-    a += rng.gauss(0, 0.4)
-    n += rng.gauss(0, 0.4)
+    o += rng.gauss(0, 0.7)
+    c += rng.gauss(0, 0.7)
+    e += rng.gauss(0, 0.7)
+    a += rng.gauss(0, 0.7)
+    n += rng.gauss(0, 0.7)
 
     def clamp(val: float) -> float:
         return round(max(1.0, min(10.0, val)), 1)
@@ -755,7 +800,6 @@ def _build_profile(
     age: int,
     occupation: str,
     neighborhood: str,
-    income: int,
     household_income: int,
     tenure: str,
     ocean: dict,
@@ -767,7 +811,9 @@ def _build_profile(
     # Sentence 1: Who they are and their life context
     tenure_phrase = "owns their home" if tenure == "Owner" else "rents in the city"
     income_phrase = (
-        f"earning ${income:,}/year" if income > 0 else "with modest personal income"
+        f"in a household earning ${household_income:,}/year"
+        if household_income > 0
+        else "with modest household income"
     )
     s1 = (
         f"{name} is a {age}-year-old {occupation} living in {neighborhood}, {tenure_phrase}, "
@@ -815,6 +861,122 @@ def _build_profile(
 
     s2 = f"They tend to be {trait_str}."
     return f"{s1} {s2}"
+
+
+# ---------------------------------------------------------------------------
+# Agent memory — 3 past delivery-app experiences (optional, LLM-backed)
+# ---------------------------------------------------------------------------
+
+# o4-mini persona prompt for eliciting delivery-app experiences. Uses the
+# `developer` role (not `system`) like run_scenario.py. Must NOT mention Prop F,
+# Proposition F, 2021, or any real prior vote, and must NOT tell the persona how
+# to vote — we only want lived, concrete experiences.
+_MEMORY_DEVELOPER_TEMPLATE = """\
+You are a {age}-year-old {race_ethnicity} {sex} living in {neighborhood}, \
+San Francisco, working as a {occupation}.
+Your household earns ${household_income:,}/year and {tenure_desc}.
+
+{profile}
+
+Recall your personal history with food-delivery apps (DoorDash, Uber Eats, \
+Grubhub) — as a customer, a gig delivery driver, and/or a small-business or \
+restaurant owner, whichever fits this person's life. Respond ONLY with valid JSON.\
+"""
+
+_MEMORY_USER_PROMPT = (
+    "Describe exactly 3 specific, realistic past experiences this person has had "
+    "with food-delivery apps. Each is one concrete first-person sentence grounded "
+    "in their life circumstances. Vary the experiences (they need not all be "
+    "positive or all negative). Do not reference any ballot measure, election, or "
+    "how you would vote.\n\n"
+    'Respond in JSON: {"experiences": ["...", "...", "..."]}'
+)
+
+
+def _build_memory_developer_prompt(agent: dict) -> str:
+    """Persona prompt used to elicit an agent's delivery-app experiences."""
+    tenure_desc = (
+        "you own your home" if agent["tenure"] == "Owner" else "you rent your home"
+    )
+    return _MEMORY_DEVELOPER_TEMPLATE.format(
+        age=agent["age"],
+        sex=agent["sex"],
+        race_ethnicity=agent["race_ethnicity"],
+        occupation=agent["occupation"],
+        neighborhood=agent["neighborhood"],
+        household_income=max(0, agent["household_income"]),
+        tenure_desc=tenure_desc,
+        profile=agent["profile"],
+    )
+
+
+def _parse_experiences(content: str) -> list:
+    """
+    Parse the model's JSON for a list of exactly 3 non-empty experience strings.
+    Returns the cleaned list, or [] on any malformed response.
+    """
+    try:
+        data = json.loads(content)
+    except (json.JSONDecodeError, TypeError):
+        return []
+    raw = data.get("experiences") if isinstance(data, dict) else None
+    if not isinstance(raw, list) or len(raw) != DELIVERY_EXPERIENCE_COUNT:
+        return []
+    cleaned = [s.strip() for s in raw if isinstance(s, str) and s.strip()]
+    if len(cleaned) != DELIVERY_EXPERIENCE_COUNT:
+        return []
+    return cleaned
+
+
+def _generate_delivery_experiences(agent: dict, client) -> list:
+    """
+    Ask o4-mini for 3 past food-delivery-app experiences for one agent.
+    One retry on a malformed response; returns [] if both attempts fail so a
+    single bad call never aborts population generation.
+    """
+    developer_prompt = _build_memory_developer_prompt(agent)
+    for _ in range(2):
+        try:
+            response = client.chat.completions.create(
+                model=MEMORY_MODEL,
+                reasoning_effort="low",
+                response_format={"type": "json_object"},
+                messages=[
+                    {"role": "developer", "content": developer_prompt},
+                    {"role": "user", "content": _MEMORY_USER_PROMPT},
+                ],
+            )
+            experiences = _parse_experiences(response.choices[0].message.content)
+            if experiences:
+                return experiences
+        except Exception as exc:  # network / API error — retry then give up
+            print(
+                f"  delivery-experience call failed for agent {agent['id']}: {exc}",
+                file=sys.stderr,
+            )
+    return []
+
+
+def _attach_delivery_experiences(agents: list) -> None:
+    """
+    Populate agent["delivery_experiences"] for every agent, concurrently.
+    Requires OPENAI_API_KEY. Mutates the agents in place.
+    """
+    if not os.environ.get("OPENAI_API_KEY"):
+        raise RuntimeError(
+            "OPENAI_API_KEY is required to generate agent memory (delivery-app "
+            "experiences). Set it or disable the agent-memory option."
+        )
+    from concurrent.futures import ThreadPoolExecutor
+    from openai import OpenAI
+
+    client = OpenAI()
+    with ThreadPoolExecutor(max_workers=MAX_CONCURRENCY) as executor:
+        results = executor.map(
+            lambda agent: _generate_delivery_experiences(agent, client), agents
+        )
+        for agent, experiences in zip(agents, results):
+            agent["delivery_experiences"] = experiences
 
 
 # ---------------------------------------------------------------------------
@@ -886,16 +1048,146 @@ def _load_cache() -> list[dict]:
 
 
 # ---------------------------------------------------------------------------
+# Representative sampling — REQ-004, REQ-011
+# The 30-agent sample is drawn to mirror SF's actual adult population on several
+# marginals (sex, race/ethnicity, tenure, household-income bracket). Targets are
+# COMPUTED from the PUMS person-weights themselves (self-calibrating), rounded to
+# 30 via largest-remainder, then hit with balanced greedy selection. This gives a
+# statistically representative sample — real income inequality, the tech/service
+# mix, renters vs owners, and ethnic diversity — instead of one lucky draw.
+# ---------------------------------------------------------------------------
+
+SAMPLE_SIZE = 30
+MAX_SWE = 4  # REQ-011
+
+# Household-income brackets spanning SF's inequality (low to very high).
+_HH_INCOME_BRACKETS = (
+    ("<$30k", 30_000),
+    ("$30-75k", 75_000),
+    ("$75-150k", 150_000),
+    ("$150-300k", 300_000),
+    ("$300k+", float("inf")),
+)
+
+# Race/ethnicity buckets used as sampling targets; rare categories fold to "Other".
+_RACE_TARGETS = ("White", "Asian", "Hispanic/Latino",
+                 "Black or African American", "Two or More Races", "Other")
+
+
+def _hh_bracket(hincp: int) -> str:
+    """Map a household income to its bracket label."""
+    for label, upper in _HH_INCOME_BRACKETS:
+        if hincp < upper:
+            return label
+    return _HH_INCOME_BRACKETS[-1][0]
+
+
+def _sample_categories(rec: dict) -> dict:
+    """Extract the sampling-dimension category values for a raw PUMS record."""
+    race = _race_ethnicity_label(str(rec.get("RAC1P", "")), str(rec.get("HISP", "1")))
+    if race not in _RACE_TARGETS:
+        race = "Other"
+    try:
+        hincp = int(rec.get("HINCP", 0) or 0)
+    except (ValueError, TypeError):
+        hincp = 0
+    return {
+        "sex": "Female" if str(rec.get("SEX")) == "2" else "Male",
+        "race": race,
+        "tenure": "Owner" if str(rec.get("TEN")) in ("1", "2") else "Renter",
+        "income": _hh_bracket(hincp),
+    }
+
+
+def _largest_remainder(weighted: dict, total: int) -> dict:
+    """Round weighted category shares to integer counts summing exactly to total."""
+    grand = sum(weighted.values()) or 1
+    exact = {k: total * v / grand for k, v in weighted.items()}
+    counts = {k: int(v) for k, v in exact.items()}
+    leftover = total - sum(counts.values())
+    order = sorted(exact, key=lambda k: exact[k] - counts[k], reverse=True)
+    for k in order[:leftover]:
+        counts[k] += 1
+    return counts
+
+
+def _compute_targets(adults: list) -> dict:
+    """Per-dimension integer quotas (each summing to SAMPLE_SIZE) computed from
+    the PWGTP-weighted marginals of the adult population."""
+    dims = ("sex", "race", "tenure", "income")
+    weighted = {d: {} for d in dims}
+    for rec in adults:
+        w = int(rec["PWGTP"])
+        cats = _sample_categories(rec)
+        for d in dims:
+            weighted[d][cats[d]] = weighted[d].get(cats[d], 0) + w
+    return {d: _largest_remainder(weighted[d], SAMPLE_SIZE) for d in dims}
+
+
+def _balanced_sample(adults: list, seed: int) -> list:
+    """Select SAMPLE_SIZE records matching SF marginals on every dimension.
+
+    Targets come from the population's own person-weights. A greedy balanced pass
+    repeatedly picks the record that fills the most still-open quota cells, breaking
+    ties by a PWGTP-weighted random order (Efraimidis-Spirakis) so within-cell
+    choices stay representative. The SWE cap (REQ-011) is enforced throughout.
+    """
+    rng = random.Random(seed)
+    targets = _compute_targets(adults)
+    remaining = {d: dict(counts) for d, counts in targets.items()}
+    dims = tuple(targets.keys())
+
+    # Weighted-random order: higher PWGTP => key closer to 1 => selected earlier.
+    order = sorted(adults, key=lambda r: rng.random() ** (1.0 / max(1, int(r["PWGTP"]))),
+                   reverse=True)
+    cats = {id(rec): _sample_categories(rec) for rec in order}
+
+    chosen, used, swe = [], set(), 0
+
+    def gain(rec):
+        c = cats[id(rec)]
+        return sum(1 for d in dims if remaining[d].get(c[d], 0) > 0)
+
+    while len(chosen) < SAMPLE_SIZE and len(used) < len(order):
+        best, best_gain = None, -1
+        for rec in order:
+            if id(rec) in used:
+                continue
+            if _is_swe(str(rec.get("OCCP", "")).strip()) and swe >= MAX_SWE:
+                continue
+            g = gain(rec)
+            if g > best_gain:
+                best, best_gain = rec, g
+                if g == len(dims):
+                    break
+        if best is None:  # only SWE-capped records left; relax cap to reach 30
+            best = next(rec for rec in order if id(rec) not in used)
+        used.add(id(best))
+        chosen.append(best)
+        if _is_swe(str(best.get("OCCP", "")).strip()):
+            swe += 1
+        c = cats[id(best)]
+        for d in dims:
+            if remaining[d].get(c[d], 0) > 0:
+                remaining[d][c[d]] -= 1
+    return chosen, targets
+
+
+# ---------------------------------------------------------------------------
 # Core generate function — importable by app.py
 # ---------------------------------------------------------------------------
 
-def generate(seed: int = 42) -> list[dict]:
+def generate(seed: int = 42, use_memory: bool = False) -> list[dict]:
     """
     Fetch PUMS data, weighted-sample 30 SF adult personas, and return as list[dict].
     REQ-001 through REQ-013. Importable interface for app.py.
 
     All global randomness seeded with random.seed(seed).
     Per-agent randomness uses random.Random(agent_id) for reproducibility.
+
+    If use_memory is True, each agent additionally gets a "delivery_experiences"
+    list of 3 LLM-generated past food-delivery-app experiences (requires
+    OPENAI_API_KEY). This is the only code path in this module that calls the LLM.
     """
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -905,45 +1197,20 @@ def generate(seed: int = 42) -> list[dict]:
     adults = [r for r in records if int(r["AGEP"]) >= 18]
     print(f"Adults (AGEP >= 18): {len(adults)}", file=sys.stderr)
 
-    # Weighted sampling — REQ-004
-    weights = [int(r["PWGTP"]) for r in adults]
+    # Representative sampling — REQ-004, REQ-011. Match SF's actual adult
+    # marginals (sex, race/ethnicity, tenure, household income) using targets
+    # computed from the PUMS person-weights. See _balanced_sample.
     random.seed(seed)
-    # We may need to sample more than 30 to handle the SWE cap (REQ-011).
-    # Strategy: sample a pool of up to 90 candidates, then enforce the cap.
-    pool_size = min(90, len(adults))
-    pool = random.choices(adults, weights=weights, k=pool_size)
+    sampled, targets = _balanced_sample(adults, seed)
 
-    # REQ-011: Enforce max 4 software engineers.
-    # Walk through the pool in order, accepting agents until we have 30,
-    # skipping SWE candidates once we've accepted 4.
-    swe_count = 0
-    MAX_SWE = 4
-    sampled = []
-    for rec in pool:
-        if len(sampled) >= 30:
-            break
-        occp = str(rec.get("OCCP", "")).strip()
-        if _is_swe(occp):
-            if swe_count >= MAX_SWE:
-                # Skip this record — cap enforced
-                continue
-            swe_count += 1
-        sampled.append(rec)
-
-    # If pool was insufficient (unlikely), pad with non-SWE from adults
-    if len(sampled) < 30:
-        # Fallback: add more from adults, excluding SWEs if already at cap
-        for rec in adults:
-            if len(sampled) >= 30:
-                break
-            if rec in sampled:
-                continue
-            occp = str(rec.get("OCCP", "")).strip()
-            if _is_swe(occp) and swe_count >= MAX_SWE:
-                continue
-            if _is_swe(occp):
-                swe_count += 1
-            sampled.append(rec)
+    # Report achieved vs target marginals so representativeness is auditable.
+    for dim in ("sex", "race", "tenure", "income"):
+        got = {}
+        for rec in sampled:
+            cat = _sample_categories(rec)[dim]
+            got[cat] = got.get(cat, 0) + 1
+        pairs = ", ".join(f"{k} {got.get(k, 0)}/{v}" for k, v in targets[dim].items())
+        print(f"  sample {dim}: {pairs}", file=sys.stderr)
 
     agents = []
     for i, rec in enumerate(sampled[:30]):
@@ -960,10 +1227,6 @@ def generate(seed: int = 42) -> list[dict]:
         puma = puma_raw.zfill(5)
 
         try:
-            pincp = int(rec.get("PINCP", 0) or 0)
-        except (ValueError, TypeError):
-            pincp = 0
-        try:
             hincp = int(rec.get("HINCP", 0) or 0)
         except (ValueError, TypeError):
             hincp = 0
@@ -976,9 +1239,9 @@ def generate(seed: int = 42) -> list[dict]:
         occupation = _map_occupation(occp)
         tenure = _tenure_label(ten)
         name = _generate_name(agent_id, rac1p, hisp, sex_code)
-        ocean = _derive_ocean(agent_id, age, sex_code, pincp, tenure, occupation)
+        ocean = _derive_ocean(agent_id, age, sex_code, hincp, tenure, occupation)
         profile = _build_profile(
-            name, age, occupation, neighborhood, pincp, hincp, tenure, ocean
+            name, age, occupation, neighborhood, hincp, tenure, ocean
         )
 
         agents.append({
@@ -990,7 +1253,6 @@ def generate(seed: int = 42) -> list[dict]:
             "neighborhood": neighborhood,
             "occupation": occupation,
             "occupation_code": occp,
-            "income_annual": pincp,
             "household_income": hincp,
             "household_income_bracket": _income_bracket(hincp),
             "tenure": tenure,
@@ -999,21 +1261,13 @@ def generate(seed: int = 42) -> list[dict]:
             "profile": profile,
         })
 
-    # REQ-012: Income spread warning — do not force, only warn
-    low_income = sum(1 for a in agents if a["income_annual"] < 35_000)
-    high_income = sum(1 for a in agents if a["income_annual"] > 120_000)
-    if low_income < 5:
+    # Optional agent memory — 3 past delivery-app experiences per agent (LLM).
+    if use_memory:
         print(
-            f"WARNING (REQ-012): Only {low_income} agents have PINCP < $35k "
-            "(expected >= 5). Income spread may be insufficient.",
+            f"Generating delivery-app experiences for {len(agents)} agents...",
             file=sys.stderr,
         )
-    if high_income < 5:
-        print(
-            f"WARNING (REQ-012): Only {high_income} agents have PINCP > $120k "
-            "(expected >= 5). Income spread may be insufficient.",
-            file=sys.stderr,
-        )
+        _attach_delivery_experiences(agents)
 
     return agents
 
@@ -1030,6 +1284,12 @@ if __name__ == "__main__":
         "--seed", type=int, default=42, help="Random seed (default: 42)"
     )
     parser.add_argument(
+        "--memory",
+        action="store_true",
+        help="Give each agent 3 LLM-generated past delivery-app experiences "
+        "(requires OPENAI_API_KEY)",
+    )
+    parser.add_argument(
         "--output",
         type=str,
         default=str(DEFAULT_OUTPUT),
@@ -1037,7 +1297,7 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    agents = generate(seed=args.seed)
+    agents = generate(seed=args.seed, use_memory=args.memory)
 
     output_path = Path(args.output)
     output_path.parent.mkdir(parents=True, exist_ok=True)

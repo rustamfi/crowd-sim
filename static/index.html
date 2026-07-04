@@ -119,6 +119,34 @@
       flex-wrap: wrap;
     }
 
+    .config-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: .4rem;
+      padding: .35rem .55rem;
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: .8rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      border-radius: var(--radius-sm);
+      transition: color .15s, background .15s;
+    }
+
+    .config-toggle:hover { color: var(--text); background: var(--surface-alt); }
+    .config-toggle .chevron { transition: transform .2s ease; }
+    .config-toggle[aria-expanded="false"] .chevron { transform: rotate(-90deg); }
+
+    .config-panel {
+      display: flex;
+      align-items: center;
+      gap: .75rem;
+      flex-wrap: wrap;
+    }
+
+    .config-panel[hidden] { display: none; }
+
     .seed-group {
       display: flex;
       align-items: center;
@@ -146,6 +174,33 @@
     }
 
     .seed-input:focus { border-color: var(--blue); background: var(--surface); }
+
+    .memory-group {
+      display: flex;
+      flex-direction: column;
+      gap: .1rem;
+    }
+
+    .memory-label {
+      display: flex;
+      align-items: center;
+      gap: .4rem;
+      font-size: .8rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      white-space: nowrap;
+      cursor: pointer;
+    }
+
+    .memory-label input { cursor: pointer; margin: 0; }
+
+    .memory-hint {
+      font-size: .68rem;
+      color: var(--text-light);
+      max-width: 260px;
+      white-space: normal;
+      line-height: 1.3;
+    }
 
     .status-text {
       font-size: .8rem;
@@ -331,8 +386,16 @@
     }
     .question-actions {
       display: flex;
-      justify-content: flex-end;
-      margin-top: .55rem;
+      align-items: center;
+      justify-content: space-between;
+      gap: .75rem;
+      margin-top: .75rem;
+    }
+    .question-vote-btns {
+      display: flex;
+      align-items: center;
+      gap: .6rem;
+      margin-left: auto;
     }
     .question-reset {
       background: none;
@@ -547,6 +610,45 @@
       flex-shrink: 0;
     }
 
+    /* ─── Agent memory (delivery-app experiences) ──────────────────────── */
+    .memory-section {
+      margin-top: .6rem;
+    }
+
+    .memory-details {
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--surface-alt);
+      padding: 0 .5rem;
+    }
+
+    .memory-summary {
+      font-size: .68rem;
+      font-weight: 700;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      color: var(--text-light);
+      cursor: pointer;
+      padding: .4rem 0;
+      list-style: revert;
+    }
+
+    .memory-summary:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+
+    .memory-list {
+      margin: 0 0 .5rem;
+      padding-left: 1.1rem;
+      display: flex;
+      flex-direction: column;
+      gap: .3rem;
+    }
+
+    .memory-list li {
+      font-size: .78rem;
+      color: var(--text);
+      line-height: 1.45;
+    }
+
     /* ─── Vote reason ──────────────────────────────────────────────────── */
     .card-reason {
       margin-top: .75rem;
@@ -751,6 +853,13 @@
       line-height: 1.65;
     }
 
+    .interesting-why {
+      margin: .6rem 0 0;
+      font-size: .78rem;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
     /* ─── Vote filter buttons ──────────────────────────────────────────── */
     .table-filter-wrap {
       display: flex;
@@ -801,44 +910,6 @@
     .page-loader p {
       font-size: .85rem;
       color: var(--text-muted);
-    }
-
-    /* ─── Progress bar ─────────────────────────────────────────────────── */
-    .progress-bar-wrap {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-md);
-      padding: 1.1rem 1.25rem;
-      box-shadow: var(--shadow-sm);
-      display: none;
-      margin-bottom: 1.25rem;
-    }
-
-    .progress-bar-wrap.visible { display: block; }
-
-    .progress-bar-label {
-      display: flex;
-      justify-content: space-between;
-      font-size: .8rem;
-      color: var(--text-muted);
-      margin-bottom: .5rem;
-    }
-
-    .progress-bar-label strong { color: var(--text); }
-
-    .progress-track {
-      height: 8px;
-      background: var(--border);
-      border-radius: 100px;
-      overflow: hidden;
-    }
-
-    .progress-fill {
-      height: 100%;
-      background: linear-gradient(90deg, var(--blue) 0%, var(--gold) 100%);
-      border-radius: 100px;
-      transition: width .4s ease;
-      width: 0%;
     }
 
     /* ─── Responsive ───────────────────────────────────────────────────── */
@@ -908,48 +979,54 @@
     <div class="container">
       <div class="controls-inner">
         <div class="controls-left">
-          <div class="seed-group">
-            <label for="seed-input">Seed</label>
-            <input
-              type="number"
-              id="seed-input"
-              class="seed-input"
-              value="42"
-              min="1"
-              max="9999"
-              aria-label="Random seed for population generation"
-            />
+          <button
+            type="button"
+            class="config-toggle"
+            id="config-toggle"
+            aria-expanded="false"
+            aria-controls="config-panel"
+          >
+            <svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+            Configuration
+          </button>
+
+          <div class="config-panel" id="config-panel" hidden>
+            <div class="seed-group">
+              <label for="seed-input">Seed</label>
+              <input
+                type="number"
+                id="seed-input"
+                class="seed-input"
+                value="42"
+                min="1"
+                max="9999"
+                aria-label="Random seed for population generation"
+              />
+            </div>
+
+            <div class="memory-group">
+              <label for="memory-input" class="memory-label">
+                <input
+                  type="checkbox"
+                  id="memory-input"
+                  aria-describedby="memory-hint"
+                />
+                Agent memory
+              </label>
+              <span id="memory-hint" class="memory-hint">
+                Each agent gets 3 past delivery-app experiences that influence their vote (slower &middot; uses OpenAI)
+              </span>
+            </div>
+
+            <button
+              id="btn-generate"
+              class="btn btn-primary"
+              aria-label="Generate a population of 30 synthetic SF residents"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+              Generate Population
+            </button>
           </div>
-
-          <button
-            id="btn-generate"
-            class="btn btn-primary"
-            aria-label="Generate a population of 30 synthetic SF residents"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-            Generate Population
-          </button>
-
-          <button
-            id="btn-vote"
-            class="btn btn-gold"
-            disabled
-            aria-label="Run the voting scenario for all agents"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-            Run Vote
-          </button>
-
-          <button
-            id="btn-revote"
-            class="btn btn-gold"
-            disabled
-            style="display:none"
-            aria-label="Re-run voting with fresh non-deterministic results"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
-            Re-vote
-          </button>
         </div>
 
         <span class="status-text" id="status-text" aria-live="polite" aria-atomic="true">
@@ -988,6 +1065,28 @@
           <button type="button" id="btn-reset-question" class="question-reset" disabled>
             Reset to default
           </button>
+          <div class="question-vote-btns">
+            <button
+              id="btn-vote"
+              class="btn btn-gold"
+              disabled
+              aria-label="Run the voting scenario for all agents"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+              Run Vote
+            </button>
+
+            <button
+              id="btn-revote"
+              class="btn btn-gold"
+              disabled
+              style="display:none"
+              aria-label="Re-run voting with fresh non-deterministic results"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+              Re-vote
+            </button>
+          </div>
         </div>
       </section>
 
@@ -1022,17 +1121,6 @@
           <h2 id="results-heading">Results Dashboard</h2>
         </div>
 
-        <!-- Progress bar (shown while voting) -->
-        <div class="progress-bar-wrap" id="progress-wrap" role="status" aria-live="polite">
-          <div class="progress-bar-label">
-            <strong id="progress-label">Running vote&hellip;</strong>
-            <span id="progress-pct">0%</span>
-          </div>
-          <div class="progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" id="progress-bar-aria">
-            <div class="progress-fill" id="progress-fill"></div>
-          </div>
-        </div>
-
         <!-- Vote tally cards -->
         <div class="tally-row" role="group" aria-label="Vote tally">
           <div class="tally-card">
@@ -1057,6 +1145,14 @@
           <h3 style="margin-bottom:.9rem;font-size:.9rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;">Vote Distribution</h3>
           <div class="chart-wrap">
             <canvas id="vote-chart" aria-label="Donut chart showing yes/no vote distribution" role="img"></canvas>
+          </div>
+        </div>
+
+        <!-- Income split chart -->
+        <div class="chart-container">
+          <h3 style="margin-bottom:.9rem;font-size:.9rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;">Vote by Income Bracket</h3>
+          <div class="chart-wrap">
+            <canvas id="income-split-chart" aria-label="Grouped bar chart of yes/no votes per household income bracket" role="img"></canvas>
           </div>
         </div>
 
@@ -1090,6 +1186,7 @@
           </div>
           <div class="interesting-meta" id="interesting-meta"></div>
           <blockquote class="interesting-quote" id="interesting-quote"></blockquote>
+          <p class="interesting-why" id="interesting-why"></p>
         </div>
 
       </section><!-- /results-section -->
@@ -1110,6 +1207,7 @@
   let results    = [];   // Array<ResultObject>
   let summary    = null; // SummaryObject | null
   let chartInst  = null; // Chart.js instance
+  let incomeChartInst = null; // Chart.js instance for the income-bracket split
   let defaultQuestion = ''; // Fetched from /api/config; the ballot default
 
   let agentFilter = 'all'; // Agent Population grid filter: all | yes | no
@@ -1123,6 +1221,7 @@
   const questionInput = $('question-input');
   const btnResetQ     = $('btn-reset-question');
   const seedInput     = $('seed-input');
+  const memoryInput   = $('memory-input');
   const statusText    = $('status-text');
   const agentGrid     = $('agent-grid');
   const agentsEmpty   = $('agents-empty');
@@ -1133,11 +1232,6 @@
   const errorClose    = $('error-close');
   const resultsSection = $('results-section');
   const pageLoader    = $('page-loader');
-  const progressWrap  = $('progress-wrap');
-  const progressFill  = $('progress-fill');
-  const progressLabel = $('progress-label');
-  const progressPct   = $('progress-pct');
-  const progressAria  = $('progress-bar-aria');
   const interestingCard = $('interesting-card');
 
   /* ── API helpers ───────────────────────────────────────────────────── */
@@ -1213,6 +1307,23 @@
       </div>`;
   }
 
+  /* ── Delivery-app memory renderer (collapsed by default) ───────────── */
+  function renderMemory(experiences) {
+    if (!Array.isArray(experiences) || experiences.length === 0) return '';
+    const items = experiences
+      .map(exp => `<li>${escHtml(exp)}</li>`)
+      .join('');
+    return `
+      <div class="memory-section">
+        <details class="memory-details">
+          <summary class="memory-summary">Delivery-app memory</summary>
+          <ul class="memory-list" aria-label="Past delivery-app experiences">
+            ${items}
+          </ul>
+        </details>
+      </div>`;
+  }
+
   /* ── Agent card renderer ───────────────────────────────────────────── */
   function renderAgentCard(agent, result) {
     const hasVote = result && result.vote;
@@ -1230,10 +1341,6 @@
       <div class="card-reason" aria-label="Vote reason">
         &ldquo;${escHtml(result.reason)}&rdquo;
       </div>` : '';
-
-    const incomeTag = agent.household_income_bracket
-      ? `<span class="tag" aria-label="Household income ${escHtml(agent.household_income_bracket)}">${escHtml(agent.household_income_bracket)}</span>`
-      : '';
 
     const tenureTag = agent.tenure
       ? `<span class="tag ${agent.tenure.toLowerCase()}" aria-label="Tenure: ${escHtml(agent.tenure)}">${escHtml(agent.tenure)}</span>`
@@ -1260,17 +1367,18 @@
           </div>
           <div class="card-meta-row">
             <span class="meta-icon" aria-hidden="true">&#128181;</span>
-            <span>${agent.income_annual != null ? '$' + agent.income_annual.toLocaleString() + '/yr' : 'N/A'}</span>
+            <span>Household: ${agent.household_income != null ? '$' + agent.household_income.toLocaleString() + '/yr' : 'N/A'}</span>
           </div>
         </div>
 
         <div class="card-tags">
-          ${incomeTag}
           ${tenureTag}
           <span class="tag" aria-label="Race/ethnicity: ${escHtml(agent.race_ethnicity)}">${escHtml(agent.race_ethnicity)}</span>
         </div>
 
         ${renderOceanBars(agent.ocean)}
+
+        ${renderMemory(agent.delivery_experiences)}
 
         ${reasonHtml}
       </article>`;
@@ -1371,6 +1479,104 @@
     });
   }
 
+  /* ── Income-bracket split chart ────────────────────────────────────── */
+  // Ordered brackets, classified from the raw household_income value (the
+  // stored household_income_bracket field only splits at $120k, so we can't
+  // use it to distinguish $120k-$200k from >$200k).
+  const INCOME_BRACKETS = [
+    { label: '<$35k',       max: 35000 },
+    { label: '$35k-$75k',   max: 75000 },
+    { label: '$75k-$120k',  max: 120000 },
+    { label: '$120k-$200k', max: 200000 },
+    { label: '>$200k',      max: Infinity },
+  ];
+  function incomeBracket(v) {
+    if (v == null || Number.isNaN(Number(v))) return null;
+    return (INCOME_BRACKETS.find(b => v < b.max) ?? INCOME_BRACKETS[INCOME_BRACKETS.length - 1]).label;
+  }
+
+  function renderIncomeSplit() {
+    const ctx = $('income-split-chart');
+    if (incomeChartInst) {
+      incomeChartInst.destroy();
+      incomeChartInst = null;
+    }
+    if (!ctx) return;
+    if (typeof Chart === 'undefined') {
+      ctx.parentElement.innerHTML = '<p style="text-align:center;color:var(--text-muted);font-size:.85rem;">Chart unavailable (CDN blocked)</p>';
+      return;
+    }
+
+    // Prefer the pre-joined summary.agents (carries bracket + vote); otherwise
+    // join top-level agents to results by id (same pattern as renderAgents).
+    let joined = summary && Array.isArray(summary.agents) ? summary.agents : null;
+    if (!joined) {
+      const resultByID = Object.fromEntries((results || []).map(r => [r.id, r]));
+      joined = (agents || []).map(a => ({ ...a, ...(resultByID[a.id] || {}) }));
+    }
+
+    // Tally Yes/No per bracket, ignoring null / parse-error votes.
+    const order = INCOME_BRACKETS.map(b => b.label);
+    const yesBy = {}, noBy = {};
+    order.forEach(b => { yesBy[b] = 0; noBy[b] = 0; });
+    joined.forEach(a => {
+      const b = incomeBracket(a.household_income);
+      if (b == null) return;
+      if (a.vote === 'Yes') yesBy[b]++;
+      else if (a.vote === 'No') noBy[b]++;
+    });
+
+    // Keep only brackets that actually have voters, preserving canonical order.
+    const labels = order.filter(b => yesBy[b] + noBy[b] > 0);
+    const yesData = labels.map(b => yesBy[b]);
+    const noData  = labels.map(b => noBy[b]);
+
+    incomeChartInst = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [
+          { label: 'Yes', data: yesData, backgroundColor: '#2e7d32', borderRadius: 4 },
+          { label: 'No',  data: noData,  backgroundColor: '#c62828', borderRadius: 4 },
+        ],
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: {
+            position: 'bottom',
+            labels: {
+              padding: 18,
+              font: { size: 13, weight: '600', family: 'Inter, system-ui, sans-serif' },
+              color: '#1a202c',
+            },
+          },
+          tooltip: {
+            callbacks: {
+              label(c) {
+                const total = yesData[c.dataIndex] + noData[c.dataIndex];
+                const pct = total ? ((c.parsed.y / total) * 100).toFixed(0) : 0;
+                return ` ${c.dataset.label}: ${c.parsed.y} (${pct}%)`;
+              },
+            },
+          },
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            ticks: { precision: 0, font: { family: 'Inter, system-ui, sans-serif' } },
+          },
+          x: {
+            ticks: { font: { family: 'Inter, system-ui, sans-serif' } },
+          },
+        },
+        animation: {
+          duration: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 800,
+        },
+      },
+    });
+  }
+
   /* ── Themes renderer ───────────────────────────────────────────────── */
   function renderThemes(themes, side) {
     const el = $(side === 'yes' ? 'yes-themes' : 'no-themes');
@@ -1413,6 +1619,14 @@
     `).join('');
 
     $('interesting-quote').textContent = most.reason ?? '';
+
+    const whyEl = $('interesting-why');
+    if (most.selection_reason) {
+      whyEl.textContent = `Why this one: ${most.selection_reason}`;
+      whyEl.style.display = '';
+    } else {
+      whyEl.style.display = 'none';
+    }
   }
 
   /* ── Results section ───────────────────────────────────────────────── */
@@ -1432,6 +1646,7 @@
       : 'All votes parsed';
 
     renderChart(summary.yes_count ?? 0, summary.no_count ?? 0);
+    renderIncomeSplit();
     renderThemes(summary.yes_themes, 'yes');
     renderThemes(summary.no_themes, 'no');
     renderInteresting(summary.most_interesting ?? null);
@@ -1465,13 +1680,23 @@
     agentsToggle.setAttribute('aria-expanded', String(!collapsed));
   });
 
+  // Collapse / expand the Configuration panel (Seed + Generate Population).
+  const configToggle = $('config-toggle');
+  const configPanel  = $('config-panel');
+  configToggle.addEventListener('click', () => {
+    const expanded = configToggle.getAttribute('aria-expanded') === 'true';
+    configToggle.setAttribute('aria-expanded', String(!expanded));
+    configPanel.hidden = expanded;
+  });
+
   /* ── Generate population ───────────────────────────────────────────── */
   btnGenerate.addEventListener('click', async () => {
     hideError();
     setLoading(btnGenerate, true);
     try {
       const seed = parseInt(seedInput.value, 10) || 42;
-      const data = await apiFetch(`/api/generate?seed=${seed}`, {
+      const memory = memoryInput.checked;
+      const data = await apiFetch(`/api/generate?seed=${seed}&memory=${memory}`, {
         method: 'POST',
       });
       agents  = data.agents ?? [];
@@ -1483,7 +1708,6 @@
       btnRevote.disabled = true;
       statusText.innerHTML = `<span class="status-count">${agents.length}</span> agents loaded`;
       resultsSection.classList.remove('visible');
-      progressWrap.classList.remove('visible');
       renderAgents();
     } catch (err) {
       showError(`Generate failed: ${err.message}`);
@@ -1498,10 +1722,8 @@
     setLoading(btnVote, true);
     btnGenerate.disabled = true;
 
-    // Show results section with progress bar before we have data
+    // Show results section before we have data
     resultsSection.classList.add('visible');
-    progressWrap.classList.add('visible');
-    setProgress(0, 'Running vote — calling LLM for each agent\u2026');
 
     try {
       const data = await apiFetch('/api/vote', {
@@ -1510,9 +1732,6 @@
       });
       results = data.results ?? [];
       summary = data.summary ?? null;
-
-      setProgress(100, 'Vote complete');
-      setTimeout(() => progressWrap.classList.remove('visible'), 1200);
 
       renderAgents();   // re-render cards with votes
       renderResults();
@@ -1530,7 +1749,6 @@
       btnRevote.disabled = false;
     } catch (err) {
       showError(`Vote failed: ${err.message}`);
-      progressWrap.classList.remove('visible');
     } finally {
       setLoading(btnVote, false);
       btnGenerate.disabled = false;
@@ -1544,8 +1762,6 @@
     btnGenerate.disabled = true;
 
     resultsSection.classList.add('visible');
-    progressWrap.classList.add('visible');
-    setProgress(0, 'Re-voting — same people, fresh reasoning\u2026');
 
     try {
       const data = await apiFetch('/api/vote?fresh=true', {
@@ -1554,9 +1770,6 @@
       });
       results = data.results ?? [];
       summary = data.summary ?? null;
-
-      setProgress(100, 'Re-vote complete');
-      setTimeout(() => progressWrap.classList.remove('visible'), 1200);
 
       renderAgents();
       renderResults();
@@ -1568,19 +1781,11 @@
       resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
     } catch (err) {
       showError(`Re-vote failed: ${err.message}`);
-      progressWrap.classList.remove('visible');
     } finally {
       setLoading(btnRevote, false);
       btnGenerate.disabled = false;
     }
   });
-
-  function setProgress(pct, label) {
-    progressFill.style.width = `${pct}%`;
-    progressLabel.textContent = label;
-    progressPct.textContent   = `${Math.round(pct)}%`;
-    progressAria.setAttribute('aria-valuenow', Math.round(pct));
-  }
 
   /* ── Ballot question ───────────────────────────────────────────────── */
   // The trimmed question to send with a vote; falls back to the default.

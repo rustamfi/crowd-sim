@@ -91,14 +91,29 @@ async def index():
     return FileResponse(str(html_path), media_type="text/html")
 
 
+@app.get("/health", include_in_schema=False)
+async def health():
+    """Lightweight liveness probe for Railway's health check. REQ-038."""
+    return {"status": "ok"}
+
+
 @app.post("/api/generate")
-async def api_generate(seed: int = Query(default=42, description="Random seed")):
+async def api_generate(
+    seed: int = Query(default=42, description="Random seed"),
+    memory: bool = Query(
+        default=False,
+        description="Give each agent 3 LLM-generated past delivery-app experiences",
+    ),
+):
     """
     Trigger population generation. Calls generate() and writes results/agents.json.
     Returns the list of 30 agent objects. REQ-034.
+
+    When memory=true, each agent additionally gets a "delivery_experiences" list
+    that influences their vote (requires OPENAI_API_KEY).
     """
     try:
-        agents = generate(seed=seed)
+        agents = generate(seed=seed, use_memory=memory)
     except Exception as exc:
         raise HTTPException(
             status_code=500,

@@ -5,6 +5,15 @@ Joins agents.json with responses.jsonl on id, computes vote tallies,
 groups yes/no reasons by keyword-based themes, identifies the most
 interesting response, and writes results/summary.md.
 
+Most Interesting Response (REQ-025)
+-----------------------------------
+Preferred: when an OpenAI client is supplied to analyze() and both sides voted,
+o4-mini picks the response most likely to change an opposing voter's mind — the
+argument most persuasive "across the aisle" — and authors a one-sentence reason
+for the pick. If no client is given, everyone voted the same way, or the LLM call
+fails, we fall back to a deterministic heuristic: the response with the longest
+reason by word count. Either way the chosen record carries a ``selection_reason``.
+
 REQ-024 through REQ-028.
 
 Theme Grouping Logic (REQ-026)
@@ -295,21 +304,116 @@ def _themes_for(
     return _group_themes(joined, vote_value, keyword_themes)
 
 
-def _most_interesting(joined: list[dict]) -> Optional[dict]:
-    """
-    Select the agent with the longest reason (by word count). REQ-025.
-    Returns the merged record or None if no valid responses exist.
-    """
-    valid = [
+def _valid_responses(joined: list[dict]) -> list[dict]:
+    """Records with a real Yes/No vote and a non-error reason."""
+    return [
         r for r in joined
         if r.get("reason")
         and r["reason"] not in ("parse_error", "")
         and not r["reason"].startswith("api_error")
         and r.get("vote") in ("Yes", "No")
     ]
+
+
+def _most_persuasive_across_aisle(valid: list[dict], question: str, client) -> dict:
+    """
+    Ask o4-mini to pick the single most persuasive-across-the-aisle response.
+
+    'Most interesting' here means the response most likely to change the mind of a
+    voter who chose the OPPOSITE side — the argument that best bridges the divide,
+    not merely the loudest one for its own camp. Returns a shallow copy of the
+    chosen record with an LLM-authored ``selection_reason``. Raises on API/parse
+    error so the caller can fall back to the deterministic heuristic.
+    """
+    numbered = "\n".join(
+        f"{i}. [{r['vote']}] {r['name']} ({r.get('occupation', 'n/a')}, "
+        f"{r.get('neighborhood', 'n/a')}): {r['reason']}"
+        for i, r in enumerate(valid)
+    )
+    developer_prompt = (
+        "You are judging which single vote is the most persuasive ACROSS THE AISLE "
+        "— the one response most likely to change the mind of a voter who chose the "
+        "OPPOSITE side. Reward reasoning that engages the other side's concerns, is "
+        "credible and specific, and finds common ground — not reasoning that merely "
+        "rallies its own camp or restates a slogan. Respond ONLY with valid JSON."
+    )
+    user_prompt = (
+        f'Ballot question: "{question}"\n\n'
+        f"Panel responses (index, [vote], name, profile, reason):\n{numbered}\n\n"
+        "Identify the ONE response most likely to move a voter from the other side. "
+        'Respond in JSON: {"index": <chosen response number>, "reason": '
+        '"<one sentence, max 30 words, naming the opposite side it would sway and '
+        'why its argument lands with them>"}.'
+    )
+
+    response = client.chat.completions.create(
+        model=LLM_MODEL,
+        reasoning_effort="low",
+        response_format={"type": "json_object"},
+        messages=[
+            {"role": "developer", "content": developer_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
+    )
+    data = json.loads(response.choices[0].message.content)
+
+    idx = data.get("index")
+    if not isinstance(idx, int) or not (0 <= idx < len(valid)):
+        raise ValueError(f"LLM returned out-of-range index: {idx!r}")
+    reason = str(data.get("reason", "")).strip()
+    if not reason:
+        raise ValueError("LLM returned an empty selection reason")
+
+    chosen = dict(valid[idx])
+    chosen["selection_reason"] = reason
+    return chosen
+
+
+def _most_interesting_longest(valid: list[dict]) -> dict:
+    """Deterministic fallback: the response with the longest reason by word count."""
+    winner = max(valid, key=lambda r: len(r["reason"].split()))
+    word_count = len(winner["reason"].split())
+    chosen = dict(winner)
+    chosen["selection_reason"] = (
+        f"Selected as the most elaborated response: at {word_count} words it "
+        f"gives the longest, most detailed reasoning of the {len(valid)} valid "
+        f"votes cast."
+    )
+    return chosen
+
+
+def _most_interesting(
+    joined: list[dict],
+    question: Optional[str] = None,
+    client=None,
+) -> Optional[dict]:
+    """
+    Select the single most interesting response. REQ-025.
+
+    When an OpenAI client and question are available AND both sides voted, o4-mini
+    picks the response most likely to change an opposing voter's mind ("most
+    persuasive across the aisle") and authors the ``selection_reason``. When
+    everyone voted the same way there is no aisle to cross, and on any LLM failure,
+    it falls back to the deterministic longest-reason heuristic. Returns a shallow
+    copy of the chosen record (so the added ``selection_reason`` never leaks into
+    the full agent table), or None if no valid responses exist.
+    """
+    valid = _valid_responses(joined)
     if not valid:
         return None
-    return max(valid, key=lambda r: len(r["reason"].split()))
+    both_sides = (
+        any(r["vote"] == "Yes" for r in valid)
+        and any(r["vote"] == "No" for r in valid)
+    )
+    if client is not None and question and both_sides:
+        try:
+            return _most_persuasive_across_aisle(valid, question, client)
+        except Exception as exc:  # noqa: BLE001 — any failure falls back gracefully
+            print(
+                f"  [WARN] LLM cross-aisle pick failed ({exc}); using longest-reason fallback.",
+                file=sys.stderr,
+            )
+    return _most_interesting_longest(valid)
 
 
 def _build_markdown(
@@ -380,6 +484,9 @@ def _build_markdown(
         )
         lines.append(">")
         lines.append(f"> \"{interesting['reason']}\"")
+        if interesting.get("selection_reason"):
+            lines.append(">")
+            lines.append(f"> _Why this one: {interesting['selection_reason']}_")
     else:
         lines.append("_No valid responses to display._")
     lines.append("")
@@ -388,10 +495,10 @@ def _build_markdown(
     lines.append("## 5. Full Agent Table")
     lines.append("")
     lines.append(
-        "| Name | Age | Neighborhood | Occupation | HH Income Bracket | Tenure | Vote |"
+        "| Name | Age | Neighborhood | Occupation | Household Income | Tenure | Vote |"
     )
     lines.append(
-        "|------|-----|-------------|------------|------------------|--------|------|"
+        "|------|-----|-------------|------------|-----------------:|--------|------|"
     )
     for record in joined:
         vote_display = record.get("vote") or "—"
@@ -399,11 +506,12 @@ def _build_markdown(
         age = record.get("age", "")
         neighborhood = record.get("neighborhood", "")
         occupation = record.get("occupation", "")
-        bracket = record.get("household_income_bracket", "")
+        hh_income = record.get("household_income")
+        income_display = f"${hh_income:,}/yr" if hh_income is not None else "N/A"
         tenure = record.get("tenure", "")
         lines.append(
             f"| {name} | {age} | {neighborhood} | {occupation} | "
-            f"{bracket} | {tenure} | {vote_display} |"
+            f"{income_display} | {tenure} | {vote_display} |"
         )
 
     lines.append("")
@@ -434,7 +542,7 @@ def analyze(agents: list[dict], responses: list[dict], client=None) -> dict:
 
     yes_themes = _themes_for(joined, "Yes", YES_THEMES, question, client)
     no_themes = _themes_for(joined, "No", NO_THEMES, question, client)
-    interesting = _most_interesting(joined)
+    interesting = _most_interesting(joined, question, client)
 
     markdown = _build_markdown(
         joined, yes_count, no_count, null_count,

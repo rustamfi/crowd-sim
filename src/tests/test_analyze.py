@@ -37,7 +37,6 @@ def _make_agent(agent_id=1, name="Jane Doe", age=35, neighborhood="Mission",
         "occupation": occupation,
         "household_income_bracket": bracket,
         "tenure": tenure,
-        "income_annual": 60000,
         "household_income": 80000,
         "vote": vote,
         "reason": reason,
@@ -45,6 +44,20 @@ def _make_agent(agent_id=1, name="Jane Doe", age=35, neighborhood="Mission",
                   "agreeableness": 6.0, "neuroticism": 5.0},
         "profile": "Jane is a nurse. She tends to be cooperative.",
     }
+
+
+class _FakeClient:
+    """Minimal stand-in for an OpenAI client returning a canned JSON string."""
+
+    def __init__(self, content: str):
+        completions = type("C", (), {
+            "create": lambda _self, **kw: type("R", (), {
+                "choices": [type("Ch", (), {
+                    "message": type("M", (), {"content": content})()
+                })()]
+            })()
+        })()
+        self.chat = type("Chat", (), {"completions": completions})()
 
 
 def _make_response(agent_id=1, name="Jane Doe", vote="Yes", reason="Fees are too high.") -> dict:
@@ -160,6 +173,61 @@ class TestMostInteresting:
             {**_make_agent(1), "vote": None, "reason": "parse_error"},
         ]
         assert _most_interesting(joined) is None
+
+    def test_includes_selection_reason(self):
+        """The winner carries a selection_reason explaining why it was chosen."""
+        joined = [
+            {**_make_agent(1, "Alice"), "vote": "Yes", "reason": "Fees are high."},
+            {**_make_agent(2, "Bob"), "vote": "No",
+             "reason": "This cap would undermine the competitive dynamics."},
+        ]
+        interesting = _most_interesting(joined)
+        assert "selection_reason" in interesting
+        assert interesting["selection_reason"]
+
+    def test_does_not_mutate_source_record(self):
+        """selection_reason lives on a copy, not the record in the agent table."""
+        joined = [
+            {**_make_agent(1, "Alice"), "vote": "Yes", "reason": "Fees are high."},
+        ]
+        _most_interesting(joined)
+        assert "selection_reason" not in joined[0]
+
+    def test_llm_judge_picks_by_index(self):
+        """With a client + question, the LLM's chosen index and reason are used."""
+        joined = [
+            {**_make_agent(1, "Alice"), "vote": "Yes", "reason": "Fees are high."},
+            {**_make_agent(2, "Bob"), "vote": "No", "reason": "Markets self-correct."},
+        ]
+        client = _FakeClient('{"index": 1, "reason": "Only voter to frame it as a market question."}')
+        interesting = _most_interesting(joined, question="Cap fees at 15%?", client=client)
+        assert interesting["name"] == "Bob"
+        assert interesting["selection_reason"] == "Only voter to frame it as a market question."
+
+    def test_llm_failure_falls_back_to_longest(self):
+        """A bad LLM index falls back to the deterministic longest-reason pick."""
+        joined = [
+            {**_make_agent(1, "Alice"), "vote": "Yes", "reason": "Short."},
+            {**_make_agent(2, "Bob"), "vote": "No",
+             "reason": "A considerably longer and more detailed articulated rationale here."},
+        ]
+        client = _FakeClient('{"index": 99, "reason": "out of range"}')
+        interesting = _most_interesting(joined, question="Cap fees at 15%?", client=client)
+        assert interesting["name"] == "Bob"  # longest reason wins on fallback
+        assert "most elaborated" in interesting["selection_reason"]
+
+    def test_one_sided_vote_skips_llm(self):
+        """With no aisle to cross (all one side), the LLM is not consulted."""
+        joined = [
+            {**_make_agent(1, "Alice"), "vote": "Yes", "reason": "Short."},
+            {**_make_agent(2, "Bob"), "vote": "Yes",
+             "reason": "A considerably longer and more detailed articulated rationale here."},
+        ]
+        # This client would raise if called (invalid JSON); proves the LLM path is skipped.
+        client = _FakeClient("not json at all")
+        interesting = _most_interesting(joined, question="Cap fees at 15%?", client=client)
+        assert interesting["name"] == "Bob"  # deterministic longest-reason pick
+        assert "most elaborated" in interesting["selection_reason"]
 
 
 # ---------------------------------------------------------------------------

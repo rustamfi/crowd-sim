@@ -278,16 +278,16 @@ crowd-sim/
 
 ### Railway
 
-The app includes a `Procfile` for Railway deployment:
+The repo ships deployment config for Railway:
 
-```
-web: uvicorn src.app:app --host 0.0.0.0 --port $PORT
-```
+- `railway.json` — Nixpacks builder, start command, and health check on `/health`
+- `Procfile` — fallback start command (`uvicorn src.app:app --host 0.0.0.0 --port $PORT`)
+- `.python-version` — pins the runtime to Python 3.11
 
 **Steps:**
 1. Connect your GitHub repo to Railway
 2. Set environment variables: `OPENAI_API_KEY`, `CENSUS_API_KEY`, `MAX_CONCURRENCY` (optional)
-3. Railway auto-detects the `Procfile` and deploys
+3. Railway builds with Nixpacks and deploys; it probes `/health` before routing traffic
 
 The `PORT` environment variable is set automatically by Railway.
 

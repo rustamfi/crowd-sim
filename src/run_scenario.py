@@ -46,17 +46,92 @@ MODEL = "o4-mini"
 # NOTE: Must NOT mention Prop F, Proposition F, 2021, or any real prior vote.
 # ---------------------------------------------------------------------------
 
+# OCEAN encoding: each 1-10 score maps to a band label plus a behavioral
+# phrase, so the model gets something it can enact rather than an unanchored
+# number. The raw score is kept in parens for auditability.
+_OCEAN_BANDS = (
+    (2.5, "very low"),
+    (4.5, "low"),
+    (6.5, "average"),
+    (8.5, "high"),
+)
+
+# (low-end behavior, average behavior, high-end behavior) per trait.
+_OCEAN_TRAITS = {
+    "openness": (
+        "conventional, prefers the familiar and proven",
+        "balances new ideas with the familiar",
+        "curious, imaginative, drawn to new ideas and change",
+    ),
+    "conscientiousness": (
+        "spontaneous, flexible, works without much structure",
+        "reasonably organized without being rigid",
+        "organized, disciplined, plans ahead",
+    ),
+    "extraversion": (
+        "reserved, draws energy from solitude",
+        "comfortable alone or with others",
+        "outgoing, talkative, energized by people",
+    ),
+    "agreeableness": (
+        "competitive, skeptical, blunt",
+        "cooperative but will stand your ground",
+        "warm, trusting, eager to cooperate",
+    ),
+    "neuroticism": (
+        "calm and emotionally steady under stress",
+        "generally steady, occasionally reactive",
+        "anxious, sensitive, easily stressed",
+    ),
+}
+
+
+def _ocean_band(score: float) -> str:
+    """Map a 1-10 score to a band label."""
+    for threshold, label in _OCEAN_BANDS:
+        if score < threshold:
+            return label
+    return "very high"
+
+
+def _describe_ocean(ocean: dict) -> str:
+    """Render OCEAN scores as 'band (score/10) — behavioral phrase' lines."""
+    lines = []
+    for trait, (low, avg, high) in _OCEAN_TRAITS.items():
+        score = ocean[trait]
+        label = _ocean_band(score)
+        if label in ("very low", "low"):
+            phrase = low
+        elif label in ("high", "very high"):
+            phrase = high
+        else:
+            phrase = avg
+        lines.append(f"- {trait.capitalize()}: {label} ({score}/10) — {phrase}.")
+    return "\n".join(lines)
+
+
 DEVELOPER_PROMPT_TEMPLATE = """\
-You are {name}, a {age}-year-old {occupation} living in {neighborhood}, San Francisco.
-You earn ${income_annual:,}/year and {tenure_desc}.
-{profile}
+You are a {age}-year-old {race_ethnicity} {sex} living in {neighborhood}, \
+San Francisco, working as a {occupation}.
+Your household earns ${household_income:,}/year and {tenure_desc}.
 
-Personality (OCEAN 1-10): Openness {openness}, Conscientiousness {conscientiousness}, \
-Extraversion {extraversion}, Agreeableness {agreeableness}, Neuroticism {neuroticism}.
-
+Your personality:
+{ocean_desc}
+{experiences_desc}
 When asked about local policy, respond as this person would, considering your life \
 circumstances, personality, and values. Respond ONLY with valid JSON.\
 """
+
+
+def _describe_experiences(experiences) -> str:
+    """
+    Render an agent's past delivery-app experiences as a prompt block, or an
+    empty string when the agent has no memory (feature disabled).
+    """
+    if not experiences:
+        return ""
+    lines = "\n".join(f"- {exp}" for exp in experiences)
+    return f"\nYour past experiences with food delivery apps:\n{lines}\n"
 
 # REQ-017: exact default question — no additions or omissions
 DEFAULT_QUESTION = (
@@ -83,22 +158,19 @@ USER_PROMPT = _build_user_prompt(DEFAULT_QUESTION)
 def _build_developer_prompt(agent: dict) -> str:
     """Construct the per-agent developer prompt from the persona card."""
     tenure_desc = (
-        "owns their home" if agent["tenure"] == "Owner" else "rents their home"
+        "you own your home" if agent["tenure"] == "Owner" else "you rent your home"
     )
     ocean = agent["ocean"]
     return DEVELOPER_PROMPT_TEMPLATE.format(
-        name=agent["name"],
         age=agent["age"],
+        sex=agent["sex"],
+        race_ethnicity=agent["race_ethnicity"],
         occupation=agent["occupation"],
         neighborhood=agent["neighborhood"],
-        income_annual=max(0, agent["income_annual"]),
+        household_income=max(0, agent["household_income"]),
         tenure_desc=tenure_desc,
-        profile=agent["profile"],
-        openness=ocean["openness"],
-        conscientiousness=ocean["conscientiousness"],
-        extraversion=ocean["extraversion"],
-        agreeableness=ocean["agreeableness"],
-        neuroticism=ocean["neuroticism"],
+        ocean_desc=_describe_ocean(ocean),
+        experiences_desc=_describe_experiences(agent.get("delivery_experiences")),
     )
 
 
