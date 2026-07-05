@@ -113,10 +113,10 @@
 
     .controls-left {
       display: flex;
-      align-items: center;
-      gap: .75rem;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: .5rem;
       flex: 1;
-      flex-wrap: wrap;
     }
 
     .config-toggle {
@@ -140,12 +140,19 @@
 
     .config-panel {
       display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      gap: .75rem;
+    }
+
+    .config-panel[hidden] { display: none; }
+
+    .config-row {
+      display: flex;
       align-items: center;
       gap: .75rem;
       flex-wrap: wrap;
     }
-
-    .config-panel[hidden] { display: none; }
 
     .seed-group {
       display: flex;
@@ -174,6 +181,34 @@
     }
 
     .seed-input:focus { border-color: var(--blue); background: var(--surface); }
+
+    .model-group {
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+    }
+
+    .model-group label {
+      font-size: .8rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      white-space: nowrap;
+    }
+
+    .model-select {
+      padding: .35rem .5rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      font-size: .85rem;
+      color: var(--text);
+      background: var(--surface-alt);
+      outline: none;
+      cursor: pointer;
+      transition: border-color .15s;
+      max-width: 260px;
+    }
+
+    .model-select:focus { border-color: var(--blue); background: var(--surface); }
 
     .memory-group {
       display: flex;
@@ -211,6 +246,11 @@
     .status-text .status-count {
       font-weight: 700;
       color: var(--blue);
+    }
+
+    .status-text .status-model {
+      color: var(--text-light);
+      font-weight: 600;
     }
 
     /* ─── Buttons ──────────────────────────────────────────────────────── */
@@ -950,6 +990,220 @@
     }
 
     .skip-link:focus { top: 0; }
+
+    /* ─── Mode tabs (Single Run / Campaign) ────────────────────────────── */
+    .mode-tabs {
+      display: flex;
+      gap: .4rem;
+      margin: 0 0 1.25rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .mode-tab {
+      padding: .55rem 1.1rem;
+      border: none;
+      border-bottom: 2px solid transparent;
+      background: none;
+      font-family: var(--font);
+      font-size: .9rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: color .15s, border-color .15s;
+      margin-bottom: -1px;
+    }
+    .mode-tab:hover { color: var(--text); }
+    .mode-tab.active { color: var(--blue-dark); border-bottom-color: var(--gold); }
+    .mode-tab:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; border-radius: var(--radius-sm); }
+
+    .single-run-actions { margin-bottom: 1.25rem; }
+
+    /* ─── Campaign controls + progress ─────────────────────────────────── */
+    .campaign-controls {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: .75rem;
+      margin-top: .25rem;
+    }
+    .campaign-n-label { font-size: .85rem; font-weight: 600; color: var(--text-muted); }
+    .campaign-n-hint { font-size: .78rem; color: var(--text-light); }
+    .campaign-controls .btn { margin-left: auto; }
+
+    .campaign-progress { margin-top: 1.1rem; }
+    .campaign-progress-text {
+      font-size: .82rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: .4rem;
+    }
+    .campaign-progress-track {
+      height: 8px;
+      background: var(--surface-alt);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      overflow: hidden;
+    }
+    .campaign-progress-fill {
+      height: 100%;
+      width: 0%;
+      background: var(--blue);
+      border-radius: var(--radius-md);
+      transition: width .3s ease;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .campaign-progress-fill { transition: none; }
+    }
+
+    .chart-wrap-wide { max-width: 640px; }
+
+    /* ── Campaign factor comparison ─────────────────────────────────── */
+    .campaign-factor-row {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: .75rem;
+      margin-top: 1rem;
+    }
+    .factor-tabs {
+      display: inline-flex;
+      flex-wrap: wrap;
+      gap: .3rem;
+      background: var(--surface-alt);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: .25rem;
+    }
+    .factor-tab {
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      font-family: var(--font);
+      font-size: .82rem;
+      font-weight: 600;
+      padding: .35rem .8rem;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: background .15s, color .15s;
+    }
+    .factor-tab:hover:not(.active) { color: var(--text); }
+    .factor-tab.active { background: var(--blue); color: #fff; }
+    .factor-tab:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+
+    .campaign-factor-config {
+      margin-top: .9rem;
+      padding: .9rem 1rem;
+      background: var(--surface-alt);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+    }
+    .factor-hint {
+      font-size: .8rem;
+      color: var(--text-muted);
+      margin: 0 0 .7rem;
+      line-height: 1.45;
+    }
+
+    .qvariant-row {
+      display: flex;
+      align-items: flex-start;
+      gap: .6rem;
+      margin-bottom: .6rem;
+    }
+    .qvariant-label {
+      flex: none;
+      width: 1.9rem;
+      padding-top: .45rem;
+      font-size: .78rem;
+      font-weight: 700;
+      color: var(--text-muted);
+    }
+    .qvariant-input {
+      flex: 1;
+      resize: vertical;
+      padding: .5rem .65rem;
+      font-family: var(--font);
+      font-size: .85rem;
+      line-height: 1.4;
+      color: var(--text);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+    }
+    .qvariant-input:focus { outline: none; border-color: var(--blue); }
+    .qvariant-remove {
+      flex: none;
+      width: 1.9rem;
+      height: 1.9rem;
+      margin-top: .2rem;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text-muted);
+      border-radius: var(--radius-sm);
+      font-size: 1.1rem;
+      line-height: 1;
+      cursor: pointer;
+    }
+    .qvariant-remove:hover:not(:disabled) { color: var(--no); border-color: var(--no); }
+    .qvariant-remove:disabled { opacity: .35; cursor: not-allowed; }
+    .factor-add-btn {
+      margin-top: .1rem;
+      padding: .4rem .85rem;
+      font-family: var(--font);
+      font-size: .8rem;
+      font-weight: 600;
+      color: var(--blue);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+    }
+    .factor-add-btn:hover { border-color: var(--blue); }
+
+    .model-check-list {
+      display: flex;
+      flex-direction: column;
+      gap: .5rem;
+    }
+    .model-check {
+      display: flex;
+      align-items: center;
+      gap: .55rem;
+      font-size: .85rem;
+      color: var(--text);
+      cursor: pointer;
+    }
+    .model-check input { width: 15px; height: 15px; cursor: pointer; }
+
+    .arm-stats-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: .9rem;
+      margin-bottom: 1.4rem;
+    }
+    .arm-stat-card {
+      padding: .85rem 1rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+    }
+    .arm-stat-head {
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+      margin-bottom: .5rem;
+    }
+    .arm-swatch {
+      flex: none;
+      width: 12px;
+      height: 12px;
+      border-radius: 3px;
+    }
+    .arm-name { font-size: .82rem; font-weight: 700; color: var(--text); }
+    .arm-stat-metrics { display: flex; flex-wrap: wrap; align-items: baseline; gap: .3rem .5rem; }
+    .arm-mean { font-size: 1.35rem; font-weight: 800; color: var(--blue); }
+    .arm-metric-label { font-size: .72rem; color: var(--text-light); text-transform: uppercase; letter-spacing: .04em; }
+    .arm-range, .arm-pass { font-size: .78rem; color: var(--text-muted); }
+    .arm-pass { margin-left: auto; }
   </style>
 </head>
 <body>
@@ -991,6 +1245,18 @@
           </button>
 
           <div class="config-panel" id="config-panel" hidden>
+            <div class="model-group">
+              <label for="model-select">Model</label>
+              <select
+                id="model-select"
+                class="model-select"
+                aria-label="Reasoning model used for voting and agent memory"
+              >
+                <option value="">Loading models&hellip;</option>
+              </select>
+            </div>
+
+            <div class="config-row">
             <div class="seed-group">
               <label for="seed-input">Seed</label>
               <input
@@ -1014,7 +1280,7 @@
                 Agent memory
               </label>
               <span id="memory-hint" class="memory-hint">
-                Each agent gets 3 past delivery-app experiences that influence their vote (slower &middot; uses OpenAI)
+                Each agent gets 3 past delivery-app experiences that influence their vote
               </span>
             </div>
 
@@ -1026,6 +1292,7 @@
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
               Generate Population
             </button>
+            </div>
           </div>
         </div>
 
@@ -1065,30 +1332,42 @@
           <button type="button" id="btn-reset-question" class="question-reset" disabled>
             Reset to default
           </button>
-          <div class="question-vote-btns">
-            <button
-              id="btn-vote"
-              class="btn btn-gold"
-              disabled
-              aria-label="Run the voting scenario for all agents"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-              Run Vote
-            </button>
-
-            <button
-              id="btn-revote"
-              class="btn btn-gold"
-              disabled
-              style="display:none"
-              aria-label="Re-run voting with fresh non-deterministic results"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
-              Re-vote
-            </button>
-          </div>
         </div>
       </section>
+
+      <!-- Mode tabs: Single Run vs Campaign (shared question + model live above) -->
+      <div class="mode-tabs" id="mode-tabs" role="tablist" aria-label="Simulation mode">
+        <button type="button" class="mode-tab active" id="tab-single" role="tab"
+                aria-selected="true" aria-controls="panel-single">Single Run</button>
+        <button type="button" class="mode-tab" id="tab-campaign" role="tab"
+                aria-selected="false" aria-controls="panel-campaign">Campaign</button>
+      </div>
+
+      <!-- ══ Single Run mode ═══════════════════════════════════════════════ -->
+      <div id="panel-single" role="tabpanel" aria-labelledby="tab-single">
+
+      <div class="question-vote-btns single-run-actions">
+        <button
+          id="btn-vote"
+          class="btn btn-gold"
+          disabled
+          aria-label="Run the voting scenario for all agents"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+          Run Vote
+        </button>
+
+        <button
+          id="btn-revote"
+          class="btn btn-gold"
+          disabled
+          style="display:none"
+          aria-label="Re-run voting with fresh non-deterministic results"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+          Re-vote
+        </button>
+      </div>
 
       <!-- Agent grid section -->
       <section id="agents-section" aria-labelledby="agents-heading">
@@ -1190,6 +1469,82 @@
         </div>
 
       </section><!-- /results-section -->
+      </div><!-- /panel-single -->
+
+      <!-- ══ Campaign mode ═════════════════════════════════════════════════ -->
+      <div id="panel-campaign" role="tabpanel" aria-labelledby="tab-campaign" hidden>
+
+        <section class="question-panel" aria-labelledby="campaign-heading">
+          <div class="question-head">
+            <label id="campaign-heading">Simulation Campaign</label>
+            <span class="question-hint">Compare vote distributions across a factor, or run one config across many populations to check robustness. The same seed set runs for every arm.</span>
+          </div>
+
+          <div class="campaign-factor-row">
+            <span class="campaign-n-label">Compare factor</span>
+            <div class="factor-tabs" id="campaign-factor" role="radiogroup" aria-label="Factor to vary across arms">
+              <button type="button" class="factor-tab active" data-factor="none" role="radio" aria-checked="true">None</button>
+              <button type="button" class="factor-tab" data-factor="question" role="radio" aria-checked="false">Question wording</button>
+              <button type="button" class="factor-tab" data-factor="memory" role="radio" aria-checked="false">Agent memory</button>
+              <button type="button" class="factor-tab" data-factor="model" role="radio" aria-checked="false">Model</button>
+            </div>
+          </div>
+
+          <div class="campaign-factor-config" id="campaign-factor-config" hidden></div>
+
+          <div class="campaign-controls">
+            <label class="campaign-n-label" for="campaign-n-input">Populations per arm</label>
+            <input type="number" id="campaign-n-input" class="seed-input" min="2" max="20" value="5"
+                   aria-describedby="campaign-heading" />
+            <span class="campaign-n-hint" id="campaign-n-hint">1 arm × 5 × 30 = 150 votes</span>
+            <button id="btn-campaign" class="btn btn-primary" aria-label="Run the simulation across multiple population seeds">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>
+              Run Campaign
+            </button>
+          </div>
+          <div class="campaign-progress" id="campaign-progress" hidden>
+            <div class="campaign-progress-text" id="campaign-progress-text" aria-live="polite"></div>
+            <div class="campaign-progress-track">
+              <div class="campaign-progress-fill" id="campaign-progress-fill" style="width:0%"></div>
+            </div>
+          </div>
+        </section>
+
+        <section id="campaign-section" aria-labelledby="campaign-results-heading">
+          <div class="section-header">
+            <h2 id="campaign-results-heading">Campaign Results</h2>
+          </div>
+
+          <!-- Empty state before any run -->
+          <div class="empty-state" id="campaign-empty">
+            <div class="empty-icon" aria-hidden="true">&#128202;</div>
+            <p>No campaign yet. Set the number of populations and click <strong>Run Campaign</strong> to see the distribution of outcomes across seeds.</p>
+          </div>
+
+          <!-- Results (revealed after first seed) -->
+          <div id="campaign-output" hidden>
+            <!-- Per-arm summary stat cards (one per factor level) -->
+            <div class="arm-stats-row" id="campaign-arms-stats" role="group" aria-label="Per-arm summary statistics"></div>
+
+            <!-- Distribution histogram (one series per arm) -->
+            <div class="chart-container">
+              <h3 style="margin-bottom:.9rem;font-size:.9rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;">Distribution of Yes-vote % Across Seeds</h3>
+              <div class="chart-wrap chart-wrap-wide">
+                <canvas id="campaign-chart" aria-label="Histogram of yes-vote percentage across population seeds, one series per arm" role="img"></canvas>
+              </div>
+            </div>
+
+            <!-- Vote by income bracket (Yes-% per bracket, one series per arm, pooled across seeds) -->
+            <div class="chart-container">
+              <h3 style="margin-bottom:.9rem;font-size:.9rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;">Vote by Income Bracket</h3>
+              <div class="chart-wrap chart-wrap-wide">
+                <canvas id="campaign-income-chart" aria-label="Grouped bar chart of yes-vote percentage per household income bracket, one series per arm" role="img"></canvas>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div><!-- /panel-campaign -->
+
     </div><!-- /container -->
   </main>
 
@@ -1209,8 +1564,19 @@
   let chartInst  = null; // Chart.js instance
   let incomeChartInst = null; // Chart.js instance for the income-bracket split
   let defaultQuestion = ''; // Fetched from /api/config; the ballot default
+  const modelLabels = {};   // model id -> friendly label (from /api/config)
 
   let agentFilter = 'all'; // Agent Population grid filter: all | yes | no
+
+  let mode = 'single';        // Active tab: 'single' | 'campaign'
+  let campaignChartInst = null; // Chart.js instance for the campaign histogram
+  let campaignIncomeChartInst = null; // Chart.js instance for the campaign income-bracket chart
+  let campaignRunning = false;  // Guards against overlapping campaign runs
+  let modelList = [];           // [{id,label}] captured from /api/config (for the model factor)
+  let campaignFactor = 'none';  // Factor varied across arms: none|question|memory|model
+  let questionVariants = [];    // Question-factor level texts (persisted across factor switches)
+  // Each arm = one factor level: {label, model, memory, question, color, results:[]}.
+  let campaignArms = [];        // Array<Arm>; every arm runs the same seed set 1..N
 
   /* ── DOM refs ──────────────────────────────────────────────────────── */
   const $ = (id) => document.getElementById(id);
@@ -1222,6 +1588,7 @@
   const btnResetQ     = $('btn-reset-question');
   const seedInput     = $('seed-input');
   const memoryInput   = $('memory-input');
+  const modelSelect   = $('model-select');
   const statusText    = $('status-text');
   const agentGrid     = $('agent-grid');
   const agentsEmpty   = $('agents-empty');
@@ -1233,6 +1600,23 @@
   const resultsSection = $('results-section');
   const pageLoader    = $('page-loader');
   const interestingCard = $('interesting-card');
+
+  // Mode tabs + campaign panel
+  const tabSingle     = $('tab-single');
+  const tabCampaign   = $('tab-campaign');
+  const panelSingle   = $('panel-single');
+  const panelCampaign = $('panel-campaign');
+  const btnCampaign   = $('btn-campaign');
+  const campaignNInput = $('campaign-n-input');
+  const campaignProgress = $('campaign-progress');
+  const campaignProgressText = $('campaign-progress-text');
+  const campaignProgressFill = $('campaign-progress-fill');
+  const campaignEmpty = $('campaign-empty');
+  const campaignOutput = $('campaign-output');
+  const campaignNHint = $('campaign-n-hint');
+  const campaignFactorTabs = $('campaign-factor');
+  const campaignFactorConfig = $('campaign-factor-config');
+  const campaignArmsStats = $('campaign-arms-stats');
 
   /* ── API helpers ───────────────────────────────────────────────────── */
   async function apiFetch(path, options = {}) {
@@ -1696,7 +2080,8 @@
     try {
       const seed = parseInt(seedInput.value, 10) || 42;
       const memory = memoryInput.checked;
-      const data = await apiFetch(`/api/generate?seed=${seed}&memory=${memory}`, {
+      const model = encodeURIComponent(getModel());
+      const data = await apiFetch(`/api/generate?seed=${seed}&memory=${memory}&model=${model}`, {
         method: 'POST',
       });
       agents  = data.agents ?? [];
@@ -1726,7 +2111,7 @@
     resultsSection.classList.add('visible');
 
     try {
-      const data = await apiFetch('/api/vote', {
+      const data = await apiFetch(`/api/vote?model=${encodeURIComponent(getModel())}`, {
         method: 'POST',
         body: JSON.stringify({ question: getQuestion() }),
       });
@@ -1736,9 +2121,9 @@
       renderAgents();   // re-render cards with votes
       renderResults();
 
-      statusText.innerHTML = summary
+      statusText.innerHTML = withModel(summary
         ? `Vote complete &mdash; <span class="status-count">${summary.yes_count} Yes</span> / <span class="status-count">${summary.no_count} No</span>`
-        : 'Vote complete';
+        : 'Vote complete', data.model);
 
       // Scroll results into view
       resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -1764,7 +2149,7 @@
     resultsSection.classList.add('visible');
 
     try {
-      const data = await apiFetch('/api/vote?fresh=true', {
+      const data = await apiFetch(`/api/vote?fresh=true&model=${encodeURIComponent(getModel())}`, {
         method: 'POST',
         body: JSON.stringify({ question: getQuestion() }),
       });
@@ -1774,9 +2159,9 @@
       renderAgents();
       renderResults();
 
-      statusText.innerHTML = summary
+      statusText.innerHTML = withModel(summary
         ? `Re-vote complete &mdash; <span class="status-count">${summary.yes_count} Yes</span> / <span class="status-count">${summary.no_count} No</span>`
-        : 'Re-vote complete';
+        : 'Re-vote complete', data.model);
 
       resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
     } catch (err) {
@@ -1786,6 +2171,53 @@
       btnGenerate.disabled = false;
     }
   });
+
+  /* ── Model selector ────────────────────────────────────────────────── */
+  // Fill the dropdown from /api/config and preselect the server default.
+  function populateModels(models, defaultModel) {
+    if (!Array.isArray(models) || models.length === 0) return;
+    modelList = models.slice();  // remembered for the campaign "Model" factor checkboxes
+    modelSelect.innerHTML = '';
+    for (const m of models) {
+      modelLabels[m.id] = m.label || m.id;
+      const opt = document.createElement('option');
+      opt.value = m.id;
+      opt.textContent = m.label || m.id;
+      if (m.id === defaultModel) opt.selected = true;
+      modelSelect.appendChild(opt);
+    }
+  }
+
+  // The selected model id, or '' to let the server pick its default.
+  function getModel() {
+    return modelSelect.value || '';
+  }
+
+  // A short, friendly name for a model id (falls back to the raw id).
+  function modelLabel(id) {
+    if (!id) return '';
+    // For a mixed set of cached models the API returns an array.
+    if (Array.isArray(id)) return id.map(modelLabel).join(', ');
+    const label = modelLabels[id] || id;
+    // Trim the "— tagline" suffix so the status line stays compact.
+    return label.split(' — ')[0];
+  }
+
+  // Append "· via <model>" to a status string when a model is known.
+  function withModel(html, model) {
+    const name = modelLabel(model);
+    return name
+      ? `${html} <span class="status-model">· via ${escHtml(name)}</span>`
+      : html;
+  }
+
+  // If cached results came from exactly one registry model, reflect it in the
+  // dropdown so the selector matches what actually produced the shown votes.
+  function syncModelSelectFrom(model) {
+    if (typeof model === 'string' && modelLabels[model]) {
+      modelSelect.value = model;
+    }
+  }
 
   /* ── Ballot question ───────────────────────────────────────────────── */
   // The trimmed question to send with a vote; falls back to the default.
@@ -1819,6 +2251,7 @@
         questionInput.value = defaultQuestion;
       }
       syncResetButton();
+      populateModels(config.models ?? [], config.default_model ?? '');
     } catch (_) { /* keep placeholder if config unavailable */ }
 
     try {
@@ -1829,11 +2262,14 @@
       }
     } catch (_) { /* no agents yet — silently skip */ }
 
+    let resultModel = null;
     try {
       const resultData = await apiFetch('/api/results');
       if (resultData.results && resultData.results.length) {
         results = resultData.results;
         summary = resultData.summary ?? null;
+        resultModel = resultData.model ?? null;
+        syncModelSelectFrom(resultModel);
         resultsOK = true;
       }
     } catch (_) { /* no results yet — silently skip */ }
@@ -1848,7 +2284,7 @@
       if (resultsOK && summary) {
         renderResults();
         statusText.innerHTML = summary
-          ? `Vote complete &mdash; <span class="status-count">${summary.yes_count} Yes</span> / <span class="status-count">${summary.no_count} No</span>`
+          ? withModel(`Vote complete &mdash; <span class="status-count">${summary.yes_count} Yes</span> / <span class="status-count">${summary.no_count} No</span>`, resultModel)
           : statusText.innerHTML;
         // Show re-vote, hide initial vote
         btnVote.style.display = 'none';
@@ -1874,6 +2310,397 @@
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#x27;');
   }
+
+  /* ══ Simulation Campaign ═══════════════════════════════════════════════ */
+
+  // Switch between Single Run and Campaign tabs. No router — just show/hide the
+  // two panels (same idiom as the collapse toggles). Shared question + model live
+  // above the tabs, so switching never loses input.
+  function switchMode(next) {
+    if (next === mode) return;
+    mode = next;
+    const single = next === 'single';
+    panelSingle.hidden   = !single;
+    panelCampaign.hidden =  single;
+    tabSingle.classList.toggle('active', single);
+    tabCampaign.classList.toggle('active', !single);
+    tabSingle.setAttribute('aria-selected', String(single));
+    tabCampaign.setAttribute('aria-selected', String(!single));
+  }
+  tabSingle.addEventListener('click', () => switchMode('single'));
+  tabCampaign.addEventListener('click', () => switchMode('campaign'));
+
+  // One color per arm (up to 4 factor levels compared at once).
+  const ARM_COLORS = ['#2d5f8a', '#c76b2e', '#3f9142', '#8e44ad'];
+
+  // Ten fixed 0–100 bins for the Yes-% distribution histogram.
+  const CAMPAIGN_BINS = ['0–10', '10–20', '20–30', '30–40', '40–50',
+                         '50–60', '60–70', '70–80', '80–90', '90–100'];
+
+  // Read the current question-variant textareas / checked models from the editor.
+  function readQuestionVariants() {
+    return Array.from(campaignFactorConfig.querySelectorAll('.qvariant-input')).map(t => t.value);
+  }
+  function readCheckedModels() {
+    return Array.from(campaignFactorConfig.querySelectorAll('.model-check-input:checked')).map(c => c.value);
+  }
+
+  // (Re)build the level editor for the question factor from `questionVariants`.
+  function buildQuestionEditor() {
+    if (questionVariants.length < 2) {
+      questionVariants = [getQuestion(), ''].concat(questionVariants.slice(2));
+    }
+    questionVariants = questionVariants.slice(0, 4);
+    const rows = questionVariants.map((q, i) => `
+      <div class="qvariant-row">
+        <span class="qvariant-label">Q${String.fromCharCode(65 + i)}</span>
+        <textarea class="qvariant-input" rows="2" placeholder="Question variant ${String.fromCharCode(65 + i)}…">${escHtml(q)}</textarea>
+        <button type="button" class="qvariant-remove" data-idx="${i}" aria-label="Remove variant"${questionVariants.length <= 2 ? ' disabled' : ''}>×</button>
+      </div>`).join('');
+    const addBtn = questionVariants.length < 4
+      ? '<button type="button" id="qvariant-add" class="factor-add-btn">+ Add variant</button>' : '';
+    campaignFactorConfig.innerHTML =
+      '<p class="factor-hint">Each non-empty variant becomes an arm. Model &amp; memory use the main configuration.</p>'
+      + rows + addBtn;
+  }
+
+  // (Re)build the level editor for the model factor from the fetched model list.
+  function buildModelEditor() {
+    if (!modelList.length) {
+      campaignFactorConfig.innerHTML = '<p class="factor-hint">No models available yet — reload once the server config loads.</p>';
+      return;
+    }
+    const rows = modelList.map((m, i) => `
+      <label class="model-check">
+        <input type="checkbox" class="model-check-input" value="${escHtml(m.id)}"${i < 2 ? ' checked' : ''} />
+        <span>${escHtml(m.label || m.id)}</span>
+      </label>`).join('');
+    campaignFactorConfig.innerHTML =
+      '<p class="factor-hint">Check 2+ models to compare. Question &amp; memory use the main configuration.</p>'
+      + '<div class="model-check-list">' + rows + '</div>';
+  }
+
+  function buildMemoryEditor() {
+    campaignFactorConfig.innerHTML =
+      '<p class="factor-hint">Runs two arms — <strong>Memory off</strong> and <strong>Memory on</strong> — using the main question &amp; model. '
+      + 'The “on” arm gives each agent 3 past delivery experiences (extra LLM calls per seed, so it is slower).</p>';
+  }
+
+  // Show the editor for `factor`, remember the active factor, refresh the hint.
+  function syncFactorUI(factor) {
+    if (campaignFactor === 'question') questionVariants = readQuestionVariants();  // preserve edits
+    campaignFactor = factor;
+    Array.from(campaignFactorTabs.querySelectorAll('.factor-tab')).forEach(t => {
+      const on = t.dataset.factor === factor;
+      t.classList.toggle('active', on);
+      t.setAttribute('aria-checked', String(on));
+    });
+    if (factor === 'question')    { campaignFactorConfig.hidden = false; buildQuestionEditor(); }
+    else if (factor === 'model')  { campaignFactorConfig.hidden = false; buildModelEditor(); }
+    else if (factor === 'memory') { campaignFactorConfig.hidden = false; buildMemoryEditor(); }
+    else { campaignFactorConfig.hidden = true; campaignFactorConfig.innerHTML = ''; }
+    syncCampaignHint();
+  }
+
+  campaignFactorTabs.addEventListener('click', (e) => {
+    if (campaignRunning) return;
+    const btn = e.target.closest('.factor-tab');
+    if (btn) syncFactorUI(btn.dataset.factor);
+  });
+
+  // Delegated add/remove for question variants (the editor is re-rendered in place).
+  campaignFactorConfig.addEventListener('click', (e) => {
+    if (e.target.id === 'qvariant-add') {
+      questionVariants = readQuestionVariants();
+      if (questionVariants.length < 4) questionVariants.push('');
+      buildQuestionEditor();
+      syncCampaignHint();
+    } else if (e.target.classList.contains('qvariant-remove')) {
+      questionVariants = readQuestionVariants();
+      if (questionVariants.length > 2) questionVariants.splice(Number(e.target.dataset.idx), 1);
+      buildQuestionEditor();
+      syncCampaignHint();
+    }
+  });
+  campaignFactorConfig.addEventListener('input', syncCampaignHint);
+
+  // Build the arm list from the active factor + editors + held-fixed main config.
+  // Each arm runs the same seed set 1..N so only the factor differs between arms.
+  function buildArms() {
+    const heldModel = getModel();
+    const heldMemory = memoryInput.checked;
+    const heldQuestion = getQuestion();
+    if (campaignFactor === 'question') {
+      return readQuestionVariants().map(q => q.trim()).filter(Boolean).slice(0, 4)
+        .map((q, i) => ({ label: `Q${String.fromCharCode(65 + i)}`, question: q, model: heldModel, memory: heldMemory, color: ARM_COLORS[i % ARM_COLORS.length] }));
+    }
+    if (campaignFactor === 'model') {
+      return readCheckedModels().slice(0, 4)
+        .map((id, i) => ({ label: modelLabel(id), question: heldQuestion, model: id, memory: heldMemory, color: ARM_COLORS[i % ARM_COLORS.length] }));
+    }
+    if (campaignFactor === 'memory') {
+      return [['Memory off', false], ['Memory on', true]]
+        .map(([label, mem], i) => ({ label, question: heldQuestion, model: heldModel, memory: mem, color: ARM_COLORS[i % ARM_COLORS.length] }));
+    }
+    return [{ label: 'All seeds', question: heldQuestion, model: heldModel, memory: heldMemory, color: ARM_COLORS[0] }];
+  }
+
+  // Live-update the "N arms × N × 30 = …" cost hint as the config changes.
+  function syncCampaignHint() {
+    const n = Math.max(2, Math.min(20, parseInt(campaignNInput.value, 10) || 5));
+    const a = buildArms().length || 1;
+    let txt = `${a} arm${a !== 1 ? 's' : ''} × ${n} × 30 = ${a * n * 30} votes`;
+    if (campaignFactor === 'memory') txt += ' · “on” arm adds memory generation';
+    campaignNHint.textContent = txt;
+  }
+  campaignNInput.addEventListener('input', syncCampaignHint);
+
+  // Build/refresh the per-arm stat cards + overlaid histogram from campaignArms.
+  // Called incrementally after each run, so the chart grows live. Per arm, seeds
+  // with no valid (Yes/No) votes are excluded (their pct_yes of 0.0 would
+  // otherwise draw a misleading 0–10 bar).
+  function renderCampaignComparison() {
+    campaignArmsStats.innerHTML = campaignArms.map(arm => {
+      const valid = arm.results.filter(r => (r.yes_count + r.no_count) > 0);
+      let mean = '—', range = '', pass = '—';
+      if (valid.length) {
+        const pcts = valid.map(r => r.pct_yes);
+        const m = pcts.reduce((a, b) => a + b, 0) / pcts.length;
+        const mn = Math.min(...pcts), mx = Math.max(...pcts);
+        const passed = pcts.filter(p => p > 50).length;
+        mean = `${m.toFixed(1)}%`;
+        range = `range ${mn.toFixed(0)}–${mx.toFixed(0)}%`;
+        pass = `pass ${passed}/${valid.length}`;
+      }
+      return `<div class="arm-stat-card">
+          <div class="arm-stat-head"><span class="arm-swatch" style="background:${arm.color}"></span><span class="arm-name">${escHtml(arm.label)}</span></div>
+          <div class="arm-stat-metrics"><span class="arm-mean">${mean}</span> <span class="arm-metric-label">mean Yes</span> <span class="arm-range">${range}</span> <span class="arm-pass">${pass}</span></div>
+        </div>`;
+    }).join('');
+
+    const ctx = $('campaign-chart');
+    if (campaignChartInst) { campaignChartInst.destroy(); campaignChartInst = null; }
+    if (!ctx) return;
+    if (typeof Chart === 'undefined') {
+      ctx.parentElement.innerHTML = '<p style="text-align:center;color:var(--text-muted);font-size:.85rem;">Chart unavailable (CDN blocked)</p>';
+      return;
+    }
+
+    const datasets = campaignArms.map(arm => {
+      const counts = new Array(10).fill(0);
+      arm.results.filter(r => (r.yes_count + r.no_count) > 0).forEach(r => {
+        counts[Math.min(9, Math.max(0, Math.floor(r.pct_yes / 10)))]++;
+      });
+      return { label: arm.label, data: counts, backgroundColor: arm.color, borderRadius: 4 };
+    });
+
+    const font = { family: 'Inter, system-ui, sans-serif' };
+    campaignChartInst = new Chart(ctx, {
+      type: 'bar',
+      data: { labels: CAMPAIGN_BINS, datasets },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { display: datasets.length > 1, position: 'bottom', labels: { font } },
+          tooltip: {
+            callbacks: {
+              title(items) { return `Yes ${items[0].label}%`; },
+              label(c) { return ` ${c.dataset.label}: ${c.parsed.y} seed${c.parsed.y !== 1 ? 's' : ''}`; },
+            },
+          },
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            title: { display: true, text: 'Number of seeds', font },
+            ticks: { precision: 0, font },
+          },
+          x: {
+            title: { display: true, text: 'Yes-vote %', font },
+            ticks: { font },
+          },
+        },
+        animation: {
+          duration: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 800,
+        },
+      },
+    });
+
+    renderCampaignIncome();
+  }
+
+  // Yes-vote % per income bracket, one series per arm, pooling every seed's voters
+  // within an arm. Reuses INCOME_BRACKETS + incomeBracket() (single source of truth for
+  // brackets — the backend only ships raw {household_income, vote}). Grows live alongside
+  // the histogram. A bracket is shown only if some arm has ≥1 valid vote in it; an arm with
+  // no sample in a shown bracket gets a null (no bar) rather than a misleading 0%.
+  function renderCampaignIncome() {
+    const ctx = $('campaign-income-chart');
+    if (campaignIncomeChartInst) { campaignIncomeChartInst.destroy(); campaignIncomeChartInst = null; }
+    if (!ctx) return;
+    if (typeof Chart === 'undefined') {
+      ctx.parentElement.innerHTML = '<p style="text-align:center;color:var(--text-muted);font-size:.85rem;">Chart unavailable (CDN blocked)</p>';
+      return;
+    }
+
+    const order = INCOME_BRACKETS.map(b => b.label);
+    // Per arm: { bracketLabel: {yes, no} }.
+    const armTallies = campaignArms.map(arm => {
+      const t = {};
+      order.forEach(b => { t[b] = { yes: 0, no: 0 }; });
+      arm.results.flatMap(r => r.voters || []).forEach(v => {
+        const b = incomeBracket(v.household_income);
+        if (b == null) return;
+        if (v.vote === 'Yes') t[b].yes++;
+        else if (v.vote === 'No') t[b].no++;
+      });
+      return t;
+    });
+
+    // Keep only brackets with votes in at least one arm, preserving canonical order.
+    const labels = order.filter(b => armTallies.some(t => t[b].yes + t[b].no > 0));
+
+    const datasets = campaignArms.map((arm, i) => ({
+      label: arm.label,
+      data: labels.map(b => {
+        const { yes, no } = armTallies[i][b];
+        const total = yes + no;
+        return total > 0 ? (yes / total) * 100 : null;
+      }),
+      backgroundColor: arm.color,
+      borderRadius: 4,
+    }));
+
+    const font = { family: 'Inter, system-ui, sans-serif' };
+    campaignIncomeChartInst = new Chart(ctx, {
+      type: 'bar',
+      data: { labels, datasets },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { display: datasets.length > 1, position: 'bottom', labels: { font } },
+          tooltip: {
+            callbacks: {
+              label(c) {
+                const t = armTallies[c.datasetIndex][labels[c.dataIndex]];
+                const total = t.yes + t.no;
+                if (!total) return ` ${c.dataset.label}: no voters`;
+                return ` ${c.dataset.label}: ${c.parsed.y.toFixed(0)}% Yes (${t.yes}/${total})`;
+              },
+            },
+          },
+        },
+        scales: {
+          y: {
+            beginAtZero: true, max: 100,
+            title: { display: true, text: 'Yes-vote %', font },
+            ticks: { precision: 0, font },
+          },
+          x: {
+            title: { display: true, text: 'Household income bracket', font },
+            ticks: { font },
+          },
+        },
+        animation: {
+          duration: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 800,
+        },
+      },
+    });
+  }
+
+  // Lock the single-run controls while a campaign runs (and vice-versa) so the two
+  // flows never issue overlapping requests. Restores the normal enabled state after.
+  function setCampaignBusy(busy) {
+    campaignRunning = busy;
+    btnGenerate.disabled  = busy;
+    btnVote.disabled      = busy || agents.length === 0;
+    btnRevote.disabled    = busy || !summary;
+    campaignNInput.disabled = busy;
+    campaignFactorTabs.style.pointerEvents = busy ? 'none' : '';
+    campaignFactorTabs.style.opacity = busy ? '.6' : '';
+    campaignFactorConfig.querySelectorAll('input, textarea, button')
+      .forEach(el => { el.disabled = busy; });
+  }
+
+  // Run the campaign: for each arm (factor level), loop seeds 1..N with one
+  // isolated request each, growing the comparison after every run. A failed run
+  // is skipped (non-fatal); a failure on the very first request (e.g. missing API
+  // key) aborts the whole campaign.
+  btnCampaign.addEventListener('click', async () => {
+    if (campaignRunning) return;
+    hideError();
+
+    let n = parseInt(campaignNInput.value, 10) || 5;
+    n = Math.max(2, Math.min(20, n));
+    campaignNInput.value = n;
+
+    if (campaignFactor === 'question') questionVariants = readQuestionVariants();
+    const arms = buildArms();
+    if (campaignFactor === 'question' && arms.length < 2) {
+      showError('Enter at least 2 non-empty question variants to compare.');
+      return;
+    }
+    if (campaignFactor === 'model' && arms.length < 2) {
+      showError('Check at least 2 models to compare.');
+      return;
+    }
+
+    campaignArms = arms.map(a => ({ ...a, results: [] }));
+    syncCampaignHint();
+    campaignEmpty.hidden = true;
+    campaignOutput.hidden = false;
+    campaignProgress.hidden = false;
+    campaignProgressFill.style.width = '0%';
+    renderCampaignComparison();
+
+    setLoading(btnCampaign, true);
+    setCampaignBusy(true);
+
+    const total = campaignArms.length * n;
+    const multi = campaignArms.length > 1;
+    let done = 0, failures = 0, aborted = false;
+    try {
+      for (let ai = 0; ai < campaignArms.length; ai++) {
+        const arm = campaignArms[ai];
+        const model = encodeURIComponent(arm.model);
+        for (let seed = 1; seed <= n; seed++) {
+          campaignProgressText.textContent = multi
+            ? `Arm ${ai + 1}/${campaignArms.length} (${arm.label}) · seed ${seed}/${n}…`
+            : `Running seed ${seed} of ${n}…`;
+          try {
+            const data = await apiFetch(`/api/campaign/run?seed=${seed}&model=${model}&memory=${arm.memory}`, {
+              method: 'POST',
+              body: JSON.stringify({ question: arm.question }),
+            });
+            arm.results.push(data);
+          } catch (err) {
+            failures++;
+            showError(`${arm.label} · seed ${seed} failed: ${err.message}`);
+            if (ai === 0 && seed === 1) { aborted = true; break; }  // e.g. no API key
+          }
+          done++;
+          campaignProgressFill.style.width = `${(done / total) * 100}%`;
+          renderCampaignComparison();
+        }
+        if (aborted) break;
+      }
+    } finally {
+      setLoading(btnCampaign, false);
+      setCampaignBusy(false);
+      const completed = campaignArms.reduce((s, a) => s + a.results.length, 0);
+      if (completed === 0) {
+        campaignOutput.hidden = true;
+        campaignEmpty.hidden = false;
+        campaignProgressText.textContent = 'Campaign stopped — no runs completed.';
+      } else {
+        campaignProgressText.textContent =
+          `Campaign complete — ${completed} of ${total} runs` + (failures ? `, ${failures} failed.` : '.');
+      }
+    }
+  });
+
+  // Initialize the factor UI (sets the cost hint to the "N arms × …" format).
+  syncFactorUI('none');
 
   /* ── Start ─────────────────────────────────────────────────────────── */
   bootstrap();

@@ -422,7 +422,7 @@ class TestGenerateIntegration:
 # Agent memory — 3 past delivery-app experiences (optional, LLM-backed)
 # ---------------------------------------------------------------------------
 def _mock_openai_client(experiences):
-    """A MagicMock OpenAI client whose completion returns the given experiences."""
+    """A MagicMock OpenRouter client whose completion returns the given experiences."""
     client = MagicMock()
     message = MagicMock()
     message.content = json.dumps({"experiences": experiences})
@@ -472,24 +472,26 @@ class TestGenerateDeliveryExperiences:
     def test_returns_three_experiences(self):
         from generate_population import _generate_delivery_experiences
         client = _mock_openai_client(["exp1", "exp2", "exp3"])
-        result = _generate_delivery_experiences(self._agent(), client)
+        result = _generate_delivery_experiences(self._agent(), client, "test/model")
         assert result == ["exp1", "exp2", "exp3"]
 
-    def test_uses_developer_role_and_o4_mini(self):
-        """o4-mini rules: developer role (not system), no temperature param."""
-        from generate_population import _generate_delivery_experiences, MEMORY_MODEL
+    def test_uses_system_role_and_openrouter_reasoning(self):
+        """OpenRouter rules: system role (not developer), unified reasoning, no temperature."""
+        from generate_population import _generate_delivery_experiences
         client = _mock_openai_client(["exp1", "exp2", "exp3"])
-        _generate_delivery_experiences(self._agent(), client)
+        _generate_delivery_experiences(self._agent(), client, "test/model")
         kwargs = client.chat.completions.create.call_args.kwargs
-        assert kwargs["model"] == MEMORY_MODEL
+        assert kwargs["model"] == "test/model"
         assert "temperature" not in kwargs
+        assert "reasoning_effort" not in kwargs
+        assert kwargs["extra_body"]["reasoning"]["effort"] == "low"
         roles = [m["role"] for m in kwargs["messages"]]
-        assert "developer" in roles and "system" not in roles
+        assert "system" in roles and "developer" not in roles
 
     def test_retries_then_returns_empty_on_persistent_failure(self):
         from generate_population import _generate_delivery_experiences
         client = _mock_openai_client(["only", "two"])  # invalid every time
-        result = _generate_delivery_experiences(self._agent(), client)
+        result = _generate_delivery_experiences(self._agent(), client, "test/model")
         assert result == []
         assert client.chat.completions.create.call_count == 2
 
@@ -497,7 +499,7 @@ class TestGenerateDeliveryExperiences:
         from generate_population import _generate_delivery_experiences
         client = MagicMock()
         client.chat.completions.create.side_effect = RuntimeError("boom")
-        assert _generate_delivery_experiences(self._agent(), client) == []
+        assert _generate_delivery_experiences(self._agent(), client, "test/model") == []
 
 
 class TestGenerateWithMemory:
@@ -521,7 +523,7 @@ class TestGenerateWithMemory:
         client = _mock_openai_client(["exp1", "exp2", "exp3"])
         with patch("generate_population._fetch_pums", return_value=fake_records), \
              patch("openai.OpenAI", return_value=client), \
-             patch.dict("os.environ", {"OPENAI_API_KEY": "test-key"}):
+             patch.dict("os.environ", {"OPENROUTER_API_KEY": "test-key"}):
             from generate_population import generate
             agents = generate(seed=42, use_memory=True)
         assert all(a["delivery_experiences"] == ["exp1", "exp2", "exp3"] for a in agents)
@@ -529,5 +531,5 @@ class TestGenerateWithMemory:
     def test_use_memory_requires_api_key(self):
         from generate_population import _attach_delivery_experiences
         with patch.dict("os.environ", {}, clear=True):
-            with pytest.raises(RuntimeError, match="OPENAI_API_KEY"):
+            with pytest.raises(RuntimeError, match="OPENROUTER_API_KEY"):
                 _attach_delivery_experiences([{"id": 1}])

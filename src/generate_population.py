@@ -63,11 +63,15 @@ DEFAULT_OUTPUT = RESULTS_DIR / "agents.json"
 # Agent-memory (delivery-app experiences) — optional, LLM-backed
 # ---------------------------------------------------------------------------
 # Population generation is LLM-free by default. The ONLY path that calls the
-# LLM is the optional agent-memory feature (use_memory=True), which asks
-# o4-mini for 3 realistic past food-delivery-app experiences per agent. The
-# experiences become part of the persona at vote time (run_scenario.py) and so
-# influence how the agent votes. Concurrency mirrors run_scenario.py.
-MEMORY_MODEL = "o4-mini"
+# LLM is the optional agent-memory feature (use_memory=True), which asks an
+# OpenRouter reasoning model for 3 realistic past food-delivery-app experiences
+# per agent. The experiences become part of the persona at vote time
+# (run_scenario.py) and so influence how the agent votes. Concurrency mirrors
+# run_scenario.py. The model is selectable (see llm.MODELS); defaults to
+# llm.DEFAULT_MODEL.
+sys.path.insert(0, str(Path(__file__).parent))
+import llm  # noqa: E402  — shared OpenRouter client + model registry
+
 MAX_CONCURRENCY = int(os.environ.get("MAX_CONCURRENCY", "10"))
 DELIVERY_EXPERIENCE_COUNT = 3
 
@@ -867,8 +871,8 @@ def _build_profile(
 # Agent memory — 3 past delivery-app experiences (optional, LLM-backed)
 # ---------------------------------------------------------------------------
 
-# o4-mini persona prompt for eliciting delivery-app experiences. Uses the
-# `developer` role (not `system`) like run_scenario.py. Must NOT mention Prop F,
+# Persona prompt for eliciting delivery-app experiences. Sent as the `system`
+# message via llm.chat_json (like run_scenario.py). Must NOT mention Prop F,
 # Proposition F, 2021, or any real prior vote, and must NOT tell the persona how
 # to vote — we only want lived, concrete experiences.
 _MEMORY_DEVELOPER_TEMPLATE = """\
@@ -928,25 +932,19 @@ def _parse_experiences(content: str) -> list:
     return cleaned
 
 
-def _generate_delivery_experiences(agent: dict, client) -> list:
+def _generate_delivery_experiences(agent: dict, client, model: str) -> list:
     """
-    Ask o4-mini for 3 past food-delivery-app experiences for one agent.
-    One retry on a malformed response; returns [] if both attempts fail so a
-    single bad call never aborts population generation.
+    Ask the selected OpenRouter model for 3 past food-delivery-app experiences
+    for one agent. One retry on a malformed response; returns [] if both attempts
+    fail so a single bad call never aborts population generation.
     """
     developer_prompt = _build_memory_developer_prompt(agent)
     for _ in range(2):
         try:
-            response = client.chat.completions.create(
-                model=MEMORY_MODEL,
-                reasoning_effort="low",
-                response_format={"type": "json_object"},
-                messages=[
-                    {"role": "developer", "content": developer_prompt},
-                    {"role": "user", "content": _MEMORY_USER_PROMPT},
-                ],
+            content = llm.chat_json(
+                client, model, developer_prompt, _MEMORY_USER_PROMPT, effort="low"
             )
-            experiences = _parse_experiences(response.choices[0].message.content)
+            experiences = _parse_experiences(content)
             if experiences:
                 return experiences
         except Exception as exc:  # network / API error — retry then give up
@@ -957,23 +955,24 @@ def _generate_delivery_experiences(agent: dict, client) -> list:
     return []
 
 
-def _attach_delivery_experiences(agents: list) -> None:
+def _attach_delivery_experiences(agents: list, model: str = None) -> None:
     """
     Populate agent["delivery_experiences"] for every agent, concurrently.
-    Requires OPENAI_API_KEY. Mutates the agents in place.
+    Requires OPENROUTER_API_KEY. Mutates the agents in place.
+    ``model`` selects the OpenRouter model (defaults to llm.DEFAULT_MODEL).
     """
-    if not os.environ.get("OPENAI_API_KEY"):
+    if not llm.api_key():
         raise RuntimeError(
-            "OPENAI_API_KEY is required to generate agent memory (delivery-app "
+            "OPENROUTER_API_KEY is required to generate agent memory (delivery-app "
             "experiences). Set it or disable the agent-memory option."
         )
     from concurrent.futures import ThreadPoolExecutor
-    from openai import OpenAI
 
-    client = OpenAI()
+    client = llm.require_client()
+    model = llm.resolve_model(model)
     with ThreadPoolExecutor(max_workers=MAX_CONCURRENCY) as executor:
         results = executor.map(
-            lambda agent: _generate_delivery_experiences(agent, client), agents
+            lambda agent: _generate_delivery_experiences(agent, client, model), agents
         )
         for agent, experiences in zip(agents, results):
             agent["delivery_experiences"] = experiences
@@ -1177,7 +1176,7 @@ def _balanced_sample(adults: list, seed: int) -> list:
 # Core generate function — importable by app.py
 # ---------------------------------------------------------------------------
 
-def generate(seed: int = 42, use_memory: bool = False) -> list[dict]:
+def generate(seed: int = 42, use_memory: bool = False, memory_model: str = None) -> list[dict]:
     """
     Fetch PUMS data, weighted-sample 30 SF adult personas, and return as list[dict].
     REQ-001 through REQ-013. Importable interface for app.py.
@@ -1187,7 +1186,9 @@ def generate(seed: int = 42, use_memory: bool = False) -> list[dict]:
 
     If use_memory is True, each agent additionally gets a "delivery_experiences"
     list of 3 LLM-generated past food-delivery-app experiences (requires
-    OPENAI_API_KEY). This is the only code path in this module that calls the LLM.
+    OPENROUTER_API_KEY). ``memory_model`` selects the OpenRouter model for that
+    step (defaults to llm.DEFAULT_MODEL). This is the only code path in this
+    module that calls the LLM.
     """
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -1267,7 +1268,7 @@ def generate(seed: int = 42, use_memory: bool = False) -> list[dict]:
             f"Generating delivery-app experiences for {len(agents)} agents...",
             file=sys.stderr,
         )
-        _attach_delivery_experiences(agents)
+        _attach_delivery_experiences(agents, memory_model)
 
     return agents
 
@@ -1287,7 +1288,14 @@ if __name__ == "__main__":
         "--memory",
         action="store_true",
         help="Give each agent 3 LLM-generated past delivery-app experiences "
-        "(requires OPENAI_API_KEY)",
+        "(requires OPENROUTER_API_KEY)",
+    )
+    parser.add_argument(
+        "--model",
+        type=str,
+        default=llm.DEFAULT_MODEL,
+        choices=[m["id"] for m in llm.MODELS],
+        help=f"OpenRouter model for agent memory (default: {llm.DEFAULT_MODEL}).",
     )
     parser.add_argument(
         "--output",
@@ -1297,7 +1305,7 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    agents = generate(seed=args.seed, use_memory=args.memory)
+    agents = generate(seed=args.seed, use_memory=args.memory, memory_model=args.model)
 
     output_path = Path(args.output)
     output_path.parent.mkdir(parents=True, exist_ok=True)

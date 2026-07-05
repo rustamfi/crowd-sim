@@ -8,7 +8,7 @@ interesting response, and writes results/summary.md.
 Most Interesting Response (REQ-025)
 -----------------------------------
 Preferred: when an OpenAI client is supplied to analyze() and both sides voted,
-o4-mini picks the response most likely to change an opposing voter's mind — the
+the reasoning model picks the response most likely to change an opposing voter's mind — the
 argument most persuasive "across the aisle" — and authors a one-sentence reason
 for the pick. If no client is given, everyone voted the same way, or the LLM call
 fails, we fall back to a deterministic heuristic: the response with the longest
@@ -19,7 +19,7 @@ REQ-024 through REQ-028.
 Theme Grouping Logic (REQ-026)
 -------------------------------
 Preferred: when an OpenAI client is supplied to analyze(), the actual Yes/No
-reasons are clustered into up to 3 themes by o4-mini, so the labels fit whatever
+reasons are clustered into up to 3 themes by the reasoning model, so the labels fit whatever
 ballot question was asked. If no client is given, or the LLM call fails, we fall
 back to the keyword-based buckets below (tuned for the delivery-fee scenario).
 
@@ -60,6 +60,9 @@ import sys
 from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Optional
+
+sys.path.insert(0, str(Path(__file__).parent))
+import llm  # noqa: E402  — shared OpenRouter client + model registry
 
 # ---------------------------------------------------------------------------
 # Paths
@@ -135,7 +138,8 @@ NO_THEMES = [
 
 
 # Reasoning model used for LLM-based theme clustering (see analyze()).
-LLM_MODEL = "o4-mini"
+# Routed through OpenRouter; uses the shared default model.
+LLM_MODEL = llm.DEFAULT_MODEL
 
 
 def _classify_reason(reason: str, themes: list[tuple]) -> str:
@@ -229,7 +233,7 @@ def _group_themes_llm(
 ) -> list[tuple[str, list[str]]]:
     """
     Cluster the reasons of agents who voted `vote_value` into up to 3 themes using
-    o4-mini, so labels fit the actual question. Returns top-3 (label, [names]).
+    the reasoning model, so labels fit the actual question. Returns top-3 (label, [names]).
     Raises on API/parse error so the caller can fall back to keyword grouping.
     """
     reasons = _collect_reasons(joined, vote_value)
@@ -253,16 +257,8 @@ def _group_themes_llm(
         f"from 0 to {len(reasons) - 1} must appear in exactly one theme."
     )
 
-    response = client.chat.completions.create(
-        model=LLM_MODEL,
-        reasoning_effort="low",
-        response_format={"type": "json_object"},
-        messages=[
-            {"role": "developer", "content": developer_prompt},
-            {"role": "user", "content": user_prompt},
-        ],
-    )
-    data = json.loads(response.choices[0].message.content)
+    content = llm.chat_json(client, LLM_MODEL, developer_prompt, user_prompt, effort="low")
+    data = json.loads(content)
 
     themes: list[tuple[str, list[str]]] = []
     seen: set[int] = set()
@@ -317,7 +313,7 @@ def _valid_responses(joined: list[dict]) -> list[dict]:
 
 def _most_persuasive_across_aisle(valid: list[dict], question: str, client) -> dict:
     """
-    Ask o4-mini to pick the single most persuasive-across-the-aisle response.
+    Ask the reasoning model to pick the single most persuasive-across-the-aisle response.
 
     'Most interesting' here means the response most likely to change the mind of a
     voter who chose the OPPOSITE side — the argument that best bridges the divide,
@@ -346,16 +342,8 @@ def _most_persuasive_across_aisle(valid: list[dict], question: str, client) -> d
         'why its argument lands with them>"}.'
     )
 
-    response = client.chat.completions.create(
-        model=LLM_MODEL,
-        reasoning_effort="low",
-        response_format={"type": "json_object"},
-        messages=[
-            {"role": "developer", "content": developer_prompt},
-            {"role": "user", "content": user_prompt},
-        ],
-    )
-    data = json.loads(response.choices[0].message.content)
+    content = llm.chat_json(client, LLM_MODEL, developer_prompt, user_prompt, effort="low")
+    data = json.loads(content)
 
     idx = data.get("index")
     if not isinstance(idx, int) or not (0 <= idx < len(valid)):
@@ -390,7 +378,7 @@ def _most_interesting(
     """
     Select the single most interesting response. REQ-025.
 
-    When an OpenAI client and question are available AND both sides voted, o4-mini
+    When an OpenAI client and question are available AND both sides voted, the reasoning model
     picks the response most likely to change an opposing voter's mind ("most
     persuasive across the aisle") and authors the ``selection_reason``. When
     everyone voted the same way there is no aisle to cross, and on any LLM failure,
@@ -528,7 +516,7 @@ def analyze(agents: list[dict], responses: list[dict], client=None) -> dict:
     Returns a summary dict for API consumption. REQ-024 through REQ-028.
 
     When `client` (an OpenAI client) is provided, Yes/No reasons are clustered into
-    themes by o4-mini so labels fit the asked question; otherwise (or on failure)
+    themes by the reasoning model so labels fit the asked question; otherwise (or on failure)
     the keyword-based buckets are used as a fallback.
     """
     joined = _join(agents, responses)

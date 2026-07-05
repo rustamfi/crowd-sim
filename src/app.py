@@ -12,6 +12,7 @@ Bind to 0.0.0.0:$PORT (Railway sets PORT; default 8000 for local dev).
 import json
 import os
 import sys
+import tempfile
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -38,6 +39,7 @@ RESPONSES_PATH = RESULTS_DIR / "responses.jsonl"
 # All three modules are free of top-level side effects.
 sys.path.insert(0, str(Path(__file__).parent))
 
+import llm                                                  # noqa: E402
 from generate_population import generate                    # noqa: E402
 from run_scenario import run_votes, DEFAULT_QUESTION         # noqa: E402
 from analyze import (                     # noqa: E402
@@ -47,16 +49,9 @@ from analyze import (                     # noqa: E402
 )
 
 
-def _openai_client():
-    """Build an OpenAI client if a key is configured, else None (analyze falls back)."""
-    api_key = os.environ.get("OPENAI_API_KEY")
-    if not api_key:
-        return None
-    try:
-        from openai import OpenAI
-        return OpenAI(api_key=api_key)
-    except Exception:
-        return None
+def _llm_client():
+    """Build the OpenRouter client if a key is configured, else None (analyze falls back)."""
+    return llm.build_client()
 
 # ---------------------------------------------------------------------------
 # FastAPI app — REQ-033
@@ -104,16 +99,21 @@ async def api_generate(
         default=False,
         description="Give each agent 3 LLM-generated past delivery-app experiences",
     ),
+    model: str = Query(
+        default=None,
+        description="OpenRouter model for agent memory (defaults to the server default)",
+    ),
 ):
     """
     Trigger population generation. Calls generate() and writes results/agents.json.
     Returns the list of 30 agent objects. REQ-034.
 
     When memory=true, each agent additionally gets a "delivery_experiences" list
-    that influences their vote (requires OPENAI_API_KEY).
+    that influences their vote (requires OPENROUTER_API_KEY). ``model`` selects the
+    OpenRouter model used for that step.
     """
     try:
-        agents = generate(seed=seed, use_memory=memory)
+        agents = generate(seed=seed, use_memory=memory, memory_model=model)
     except Exception as exc:
         raise HTTPException(
             status_code=500,
@@ -135,13 +135,25 @@ async def api_generate(
 
 @app.get("/api/config")
 async def api_config():
-    """Return client configuration, including the default ballot question."""
-    return {"status": "ok", "default_question": DEFAULT_QUESTION}
+    """
+    Return client configuration: the default ballot question and the set of
+    selectable OpenRouter models (id + label) plus the default model id.
+    """
+    return {
+        "status": "ok",
+        "default_question": DEFAULT_QUESTION,
+        "models": llm.MODELS,
+        "default_model": llm.DEFAULT_MODEL,
+    }
 
 
 @app.post("/api/vote")
 async def api_vote(
     fresh: bool = Query(default=False, description="Clear cached votes and re-run all agents"),
+    model: str = Query(
+        default=None,
+        description="OpenRouter model to vote with (defaults to the server default)",
+    ),
     question: str = Body(
         default=None,
         embed=True,
@@ -149,18 +161,18 @@ async def api_vote(
     ),
 ):
     """
-    Trigger voting scenario for all agents. Requires OPENAI_API_KEY. REQ-034, REQ-037.
+    Trigger voting scenario for all agents. Requires OPENROUTER_API_KEY. REQ-034, REQ-037.
     Pass ?fresh=true to discard cached votes and re-run (non-deterministic results).
-    An optional JSON body {"question": "..."} overrides the default ballot question;
-    cached votes are reused only when the same question is asked again.
+    ``model`` selects the OpenRouter reasoning model. An optional JSON body
+    {"question": "..."} overrides the default ballot question; cached votes are
+    reused only when the same question is asked again.
     """
     # REQ-037: Check API key before doing any work
-    api_key = os.environ.get("OPENAI_API_KEY")
-    if not api_key:
+    if not llm.api_key():
         raise HTTPException(
             status_code=400,
             detail=(
-                "OPENAI_API_KEY environment variable is not set. "
+                "OPENROUTER_API_KEY environment variable is not set. "
                 "Set it on the server before calling this endpoint."
             ),
         )
@@ -181,7 +193,7 @@ async def api_vote(
     question = (question or "").strip() or DEFAULT_QUESTION
 
     try:
-        vote_results = run_votes(agents, question=question)
+        vote_results = run_votes(agents, question=question, model=model)
     except EnvironmentError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
@@ -192,7 +204,7 @@ async def api_vote(
 
     # Run analysis inline to produce summary for the frontend
     try:
-        summary = analyze(agents, vote_results, client=_openai_client())
+        summary = analyze(agents, vote_results, client=_llm_client())
     except Exception:
         summary = {}
 
@@ -204,6 +216,7 @@ async def api_vote(
     return {
         "status": "ok",
         "question": question,
+        "model": llm.resolve_model(model),
         "yes_count": yes_count,
         "no_count": no_count,
         "null_count": null_count,
@@ -212,6 +225,106 @@ async def api_vote(
         "no_pct": round(no_count / total_valid * 100, 1) if total_valid > 0 else 0.0,
         "results": vote_results,
         "summary": summary,
+    }
+
+
+@app.post("/api/campaign/run")
+async def api_campaign_run(
+    seed: int = Query(description="Population seed for this campaign run (1..20)"),
+    model: str = Query(
+        default=None,
+        description="OpenRouter model to vote with (defaults to the server default)",
+    ),
+    memory: bool = Query(
+        default=False,
+        description="Give each agent 3 LLM-generated past delivery-app experiences",
+    ),
+    question: str = Body(
+        default=None,
+        embed=True,
+        description="Ballot question to ask each agent (defaults to the SF fee cap measure).",
+    ),
+):
+    """
+    Run a SINGLE isolated seed of a simulation campaign: generate a population,
+    have all 30 agents vote, and return that run's Yes/No tally. Requires
+    OPENROUTER_API_KEY. Unlike /api/vote, this never touches the shared single-run
+    state (results/agents.json, responses.jsonl, summary.md) — votes go to a
+    throwaway temp file — so a campaign leaves the on-screen single run intact.
+
+    The frontend calls this once per seed (1..N) and aggregates the returned
+    ``pct_yes`` values into a distribution histogram.
+    """
+    # Mirror /api/vote: check API key before doing any work
+    if not llm.api_key():
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "OPENROUTER_API_KEY environment variable is not set. "
+                "Set it on the server before calling this endpoint."
+            ),
+        )
+
+    # Server-side cap so a crafted request can't launch an unbounded run
+    if not 1 <= seed <= 20:
+        raise HTTPException(
+            status_code=400,
+            detail="seed must be between 1 and 20.",
+        )
+
+    question = (question or "").strip() or DEFAULT_QUESTION
+
+    try:
+        agents = generate(seed=seed, use_memory=memory, memory_model=model)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Population generation failed: {exc}",
+        ) from exc
+
+    # Vote against a throwaway file so the shared responses.jsonl is untouched and
+    # the vote cache never collides across seeds (agent ids are always 1..30).
+    fd, tmp_name = tempfile.mkstemp(suffix=".jsonl", prefix="campaign_")
+    os.close(fd)
+    tmp_path = Path(tmp_name)
+    try:
+        vote_results = run_votes(
+            agents, question=question, model=model, output_path=tmp_path
+        )
+    except EnvironmentError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Voting scenario failed: {exc}",
+        ) from exc
+    finally:
+        tmp_path.unlink(missing_ok=True)
+
+    yes_count = sum(1 for r in vote_results if r.get("vote") == "Yes")
+    no_count = sum(1 for r in vote_results if r.get("vote") == "No")
+    null_count = sum(1 for r in vote_results if r.get("vote") is None)
+    total_valid = yes_count + no_count
+
+    # Per-agent household income + vote so the frontend can pool an income-bracket
+    # breakdown across seeds/arms. Join on id (household income lives on the agent,
+    # the vote on the result), same pattern as analyze._join. Kept lightweight — no
+    # reasons/personas — and the bracket definitions stay solely in the frontend.
+    vote_by_id = {int(r["id"]): r.get("vote") for r in vote_results}
+    voters = [
+        {"household_income": a.get("household_income"), "vote": vote_by_id.get(int(a["id"]))}
+        for a in agents
+    ]
+
+    return {
+        "status": "ok",
+        "seed": seed,
+        "model": llm.resolve_model(model),
+        "yes_count": yes_count,
+        "no_count": no_count,
+        "null_count": null_count,
+        "pct_yes": round(yes_count / total_valid * 100, 1) if total_valid > 0 else 0.0,
+        "voters": voters,
     }
 
 
@@ -254,7 +367,7 @@ async def api_get_results():
     try:
         agents = _load_agents(AGENTS_PATH)
         responses = _load_responses(RESPONSES_PATH)
-        summary = analyze(agents, responses, client=_openai_client())
+        summary = analyze(agents, responses, client=_llm_client())
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except Exception as exc:
@@ -275,12 +388,17 @@ async def api_get_results():
         for a in agents
     ]
 
+    # Report the model(s) that produced these cached votes so the UI can show it.
+    models_used = sorted({r.get("model") for r in responses if r.get("model")})
+    model = models_used[0] if len(models_used) == 1 else (models_used or None)
+
     yes_count = summary.get("yes_count", 0)
     no_count = summary.get("no_count", 0)
     total_valid = yes_count + no_count
 
     return {
         "status": "ok",
+        "model": model,
         "results": vote_results,
         "summary": {
             **summary,

@@ -66,7 +66,7 @@ def _make_response(agent_id=1, name="Jane Doe", vote="Yes", reason="Fees are too
         "name": name,
         "vote": vote,
         "reason": reason,
-        "model": "o4-mini",
+        "model": "anthropic/claude-sonnet-5",
         "timestamp_utc": "2024-01-01T00:00:00+00:00",
     }
 
