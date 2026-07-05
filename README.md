@@ -23,6 +23,7 @@ By default the crowd votes on a measure to **cap food delivery app fees at 15%**
 - [Configuration Reference](#configuration-reference)
 - [Command Line (advanced)](#command-line-advanced)
 - [How It Works](#how-it-works)
+- [Example: A Full Sample Run](#example-a-full-sample-run)
 - [Deployment](#deployment)
 - [Troubleshooting](#troubleshooting)
 
@@ -248,6 +249,92 @@ analyze.py              →  results/summary.md        (themed summary)
 **Reproducibility.** Population sampling and per-agent attributes are fully seeded — the same seed always yields the same 30 people. Only the *voting* is non-deterministic (the model reasons freshly each time), which is what makes **Re-vote** and **Campaign** mode meaningful.
 
 For the full requirement list and data-model details, see `specs/prd.md` and `specs/architecture.md`.
+
+---
+
+## Example: A Full Sample Run
+
+To make the output concrete, here is one complete sample: the 30-agent population the pipeline drew, and the vote each of them cast. This is a real run using **`anthropic/claude-sonnet-5`** on the default ballot question:
+
+> *San Francisco is voting on a measure that would cap food delivery app fees (DoorDash, Uber Eats) at 15%. As a resident, would you vote Yes or No? Give your single most important reason in one sentence.*
+
+**Outcome: 28 Yes (93.3%) · 2 No (6.7%) · 0 errors.** The two No votes both come from higher-income residents making a market/price-controls argument; the Yes coalition converges overwhelmingly on protecting small local restaurants.
+
+> Remember this is **one** non-deterministic run — re-voting or changing the seed will shift both the tally and the reasons.
+
+### The population
+
+OCEAN columns are **O**penness · **C**onscientiousness · **E**xtraversion · **A**greeableness · **N**euroticism (0–10).
+
+| # | Name | Age | Sex | Race/Ethnicity | Neighborhood | Occupation | Household Income | Tenure | O | C | E | A | N |
+|---|------|-----|-----|----------------|--------------|------------|-----------------|--------|---|---|---|---|---|
+| 1 | Barbara Robinson | 55 | Female | White | Richmond | Education | $208,000 | Renter | 6.0 | 6.3 | 6.1 | 6.2 | 5.5 |
+| 2 | Walter Wang | 21 | Male | Asian | Chinatown | Not in labor force | -$60,000 | Renter | 7.3 | 3.6 | 4.8 | 4.6 | 9.1 |
+| 3 | Joseph Robinson | 33 | Male | White | Nob Hill | Mechanical Engineer | $410,000 | Renter | 7.2 | 6.3 | 5.8 | 5.1 | 5.2 |
+| 4 | Tony Yang | 50 | Male | Asian | Pacific Heights | Laborer | $142,000 | Renter | 5.2 | 4.7 | 5.5 | 5.7 | 5.6 |
+| 5 | Tina Lee | 41 | Female | Asian | Excelsior | Advertising Manager | $240,800 | Renter | 7.4 | 6.5 | 6.7 | 4.3 | 6.6 |
+| 6 | Rebecca Robinson | 37 | Female | White | Parkside | Elementary School Teacher | $180,000 | Renter | 5.3 | 6.1 | 5.8 | 5.9 | 6.5 |
+| 7 | Andy Zhang | 20 | Male | Asian | Noe Valley | Refuse Collector | $523,100 | Renter | 6.7 | 5.1 | 7.8 | 4.9 | 5.5 |
+| 8 | Tony Lin | 34 | Male | Asian | Glen Park | Business/Finance | $1,137,000 | Renter | 6.3 | 6.3 | 7.5 | 4.8 | 4.4 |
+| 9 | Ashley Clark | 94 | Female | White | South Beach | Not in labor force | -$60,000 | Renter | 3.9 | 6.9 | 5.2 | 8.4 | 5.5 |
+| 10 | Andrew Johnson | 79 | Male | White | Chinatown | Arts/Media | $86,800 | Owner | 6.2 | 7.1 | 5.0 | 6.2 | 3.4 |
+| 11 | Nancy Singh | 43 | Female | Asian | Portola | Protective Service | $35,000 | Renter | 5.1 | 6.6 | 7.6 | 7.4 | 7.2 |
+| 12 | Graciela Ramirez | 44 | Female | Hispanic/Latino | Potrero Hill | Management | $60,700 | Renter | 4.7 | 5.6 | 6.6 | 6.1 | 5.5 |
+| 13 | Thomas Taylor | 64 | Male | White | Sunset | Business/Finance | $442,000 | Owner | 6.0 | 6.8 | 6.6 | 4.8 | 2.2 |
+| 14 | Linda Clark | 47 | Female | White | Bayview | Management | $320,000 | Renter | 5.8 | 7.2 | 7.7 | 5.5 | 6.8 |
+| 15 | Amy Chen | 47 | Female | Asian | Castro | Office/Admin | $106,000 | Owner | 4.8 | 7.0 | 5.4 | 6.9 | 6.2 |
+| 16 | Claudia Cruz | 54 | Female | Hispanic/Latino | Sunset | Sales | $444,000 | Owner | 5.9 | 7.1 | 6.2 | 6.2 | 4.9 |
+| 17 | Kimberly Harris | 55 | Female | White | Parkside | Management | $290,000 | Owner | 5.7 | 7.5 | 5.9 | 7.1 | 4.6 |
+| 18 | Susan Brown | 26 | Female | White | Glen Park | Rental Clerk | $450,000 | Renter | 6.6 | 5.3 | 5.6 | 6.1 | 6.9 |
+| 19 | Sofia Rodriguez | 58 | Female | Hispanic/Latino | Haight-Ashbury | Radiologist | $104,000 | Owner | 5.5 | 6.5 | 5.3 | 7.1 | 4.9 |
+| 20 | Adrian Lopez | 37 | Male | Hispanic/Latino | Nob Hill | Cleaning/Maintenance | $183,000 | Owner | 5.6 | 6.6 | 5.2 | 4.6 | 5.0 |
+| 21 | Susan Harris | 54 | Female | White | Pacific Heights | Arts/Media | $297,000 | Owner | 6.2 | 7.2 | 5.5 | 6.1 | 5.9 |
+| 22 | Hiro Zhang | 38 | Male | Asian | Glen Park | Computer/Math | $260,000 | Renter | 5.7 | 7.1 | 5.2 | 3.3 | 3.7 |
+| 23 | Ruben Torres | 35 | Male | Hispanic/Latino | Noe Valley | Data Scientist | $76,040 | Owner | 6.3 | 6.2 | 5.5 | 5.0 | 4.9 |
+| 24 | Melissa White | 83 | Female | White | West Portal | Not in labor force | $102,500 | Owner | 4.1 | 7.7 | 5.4 | 8.7 | 5.4 |
+| 25 | Michael Chen | 41 | Male | Asian | Sunset | Producer/Director | $25,500 | Renter | 6.7 | 4.5 | 5.5 | 5.9 | 5.5 |
+| 26 | Eugene Park | 26 | Male | Asian | Pacific Heights | Office/Admin | $93,770 | Owner | 4.6 | 4.4 | 6.3 | 5.1 | 5.9 |
+| 27 | Winston Chan | 57 | Male | Asian | Bernal Heights | Food Preparation Worker | $209,500 | Owner | 4.4 | 5.9 | 4.7 | 7.4 | 5.3 |
+| 28 | Taylor Hassan | 59 | Male | Two or More Races | Richmond | Financial Services Sales Agent | $55,900 | Owner | 4.5 | 7.1 | 4.7 | 5.7 | 5.7 |
+| 29 | Derrick Harris | 44 | Male | Black or African American | Chinatown | Not in labor force | $17,400 | Renter | 5.9 | 3.6 | 5.1 | 5.7 | 6.4 |
+| 30 | Skyler Muller | 26 | Male | Two or More Races | Diamond Heights | Data Scientist | $61,100 | Renter | 7.9 | 3.3 | 6.0 | 5.0 | 6.4 |
+
+> Negative household income (agents 2 and 9) is a real feature of Census microdata — it reflects business or investment losses reported for the household, not an error.
+
+### The votes
+
+| # | Name | Vote | Reason |
+|---|------|------|--------|
+| 1 | Barbara Robinson | ✅ Yes | Small local restaurants need protection from excessive fees that eat into their already thin profit margins. |
+| 2 | Walter Wang | ✅ Yes | Small restaurants in my neighborhood are already struggling, and capping those fees feels like a small way to help them survive without passing even more costs onto people like me who don't have much money. |
+| 3 | Joseph Robinson | ✅ Yes | Capping fees helps protect small local restaurants from being squeezed by app platforms, which matters more to me than the marginal convenience cost to me personally. |
+| 4 | Tony Yang | ✅ Yes | Capping those fees helps protect local restaurants and workers from getting squeezed too hard by the big delivery apps. |
+| 5 | Tina Lee | ✅ Yes | Small restaurants in my neighborhood are getting crushed by predatory fees, and that's bad for the local economy I actually care about. |
+| 6 | Rebecca Robinson | ✅ Yes | Capping fees helps protect local restaurants and workers from excessive charges, which feels like the fairer choice for our community. |
+| 7 | Andy Zhang | ✅ Yes | Capping the fees helps protect local restaurants and workers from being squeezed by huge app commissions, which feels fair even if it's not something that directly affects my paycheck. |
+| 8 | Tony Lin | ✅ Yes | Capping fees helps protect local restaurants' already thin margins from being squeezed by excessive platform charges. |
+| 9 | Ashley Clark | ✅ Yes | It seems only fair to help the small local restaurants keep more of their earnings instead of losing so much to these big delivery companies. |
+| 10 | Andrew Johnson | ✅ Yes | Capping fees helps protect the small neighborhood restaurants here in Chinatown that keep our community's character alive. |
+| 11 | Nancy Singh | ✅ Yes | Capping those fees helps protect small local restaurants and workers from being squeezed too hard, which matters a lot to me given how tight budgets are for working families like mine. |
+| 12 | Graciela Ramirez | ✅ Yes | Capping fees helps protect small local restaurants from being squeezed by high commissions, which matters to me and my community here in Potrero Hill. |
+| 13 | Thomas Taylor | ❌ No | Government price controls on private business fees tend to backfire, reducing service quality or restaurant options rather than truly helping the people they intend to protect. |
+| 14 | Linda Clark | ✅ Yes | Small local restaurants in my community are getting squeezed by excessive fees, and it's important to support neighborhood businesses even if it's a small inconvenience for higher-income households like mine. |
+| 15 | Amy Chen | ✅ Yes | Capping fees helps protect local restaurants and workers from excessive charges, which supports the community I care about. |
+| 16 | Claudia Cruz | ✅ Yes | Capping fees helps protect local restaurants from excessive charges that eat into their already thin margins. |
+| 17 | Kimberly Harris | ✅ Yes | Capping fees helps protect local restaurants from excessive charges that squeeze their already thin margins. |
+| 18 | Susan Brown | ✅ Yes | I think it's important to protect local restaurants and workers from excessive fees, even if it means the apps might adjust pricing elsewhere. |
+| 19 | Sofia Rodriguez | ✅ Yes | Capping fees helps protect local restaurants from excessive charges that can threaten their already thin profit margins. |
+| 20 | Adrian Lopez | ✅ Yes | Capping fees helps protect local restaurants and workers from excessive charges that cut into their already thin margins. |
+| 21 | Susan Harris | ✅ Yes | Capping fees helps protect small local restaurants from excessive costs that squeeze their already thin margins. |
+| 22 | Hiro Zhang | ❌ No | Price controls on delivery fees will just cause the platforms to shift costs elsewhere, and I'd rather let market competition sort out pricing than have the government micromanage a business model. |
+| 23 | Ruben Torres | ✅ Yes | Capping fees helps protect local restaurants from excessive charges that eat into their already thin margins. |
+| 24 | Melissa White | ✅ Yes | It seems only fair to protect small local restaurants from excessive fees that eat into their already thin profits. |
+| 25 | Michael Chen | ✅ Yes | Capping fees helps protect small local restaurants and workers from excessive charges, which matters a lot given how tight budgets are for folks like me in this city. |
+| 26 | Eugene Park | ✅ Yes | Capping fees helps local restaurants stay afloat and keeps delivery costs more reasonable for people like me who order takeout often. |
+| 27 | Winston Chan | ✅ Yes | Restaurants in this city, including places like where I work, are already struggling with costs, and capping those fees helps small food businesses keep more of their earnings to survive. |
+| 28 | Taylor Hassan | ✅ Yes | Capping fees helps protect local restaurants and workers from excessive charges that hurt small businesses I care about in my community. |
+| 29 | Derrick Harris | ✅ Yes | Small local restaurants in my neighborhood need relief from high fees so they can survive and keep serving the community. |
+| 30 | Skyler Muller | ✅ Yes | Small restaurants and gig workers in the city need protection from predatory fee structures that squeeze already thin margins. |
 
 ---
 
