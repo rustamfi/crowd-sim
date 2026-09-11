@@ -50,6 +50,7 @@ _APP_REFERER = "https://github.com/crowd-sim"
 # ---------------------------------------------------------------------------
 MODELS = [
     {"id": "anthropic/claude-sonnet-5", "label": "Claude Sonnet 5"},
+    {"id": "x-ai/grok-4.3", "label": "Grok 4.3"},
     {"id": "mistralai/mistral-medium-3-5", "label": "Mistral Medium 3.5"},
     {"id": "deepseek/deepseek-v4-flash", "label": "DeepSeek V4 Flash"},
 ]

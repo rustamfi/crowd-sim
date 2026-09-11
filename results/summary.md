@@ -11,10 +11,10 @@
 
 ## 2. Top Reasons — Yes
 
-**1. Protecting restaurants and workers** (23 voters)
+**1. Protect small restaurants and workers** (23 voters)
   - Representatives: Barbara Robinson, Walter Wang, Joseph Robinson (+20 more)
 
-**2. Affordability for consumers** (7 voters)
+**2. Affordability for budget-conscious consumers** (7 voters)
   - Representatives: Tony Yang, Tina Lee, Graciela Ramirez (+4 more)
 
 ## 3. Top Reasons — No
