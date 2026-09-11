@@ -155,7 +155,7 @@ Click the **Campaign** tab to run *many* populations at once and see the **distr
 | Control | What it does |
 |---------|--------------|
 | **Compare factor** | What to vary across *arms* (side-by-side variants): **None** (one arm, robustness only), **Question wording**, **Agent memory** (on vs. off), or **Model** (several models head-to-head). When you pick a factor, a config area appears for defining each level. |
-| **Populations per arm** | How many seeds (2–20) each arm runs. Every arm runs the **same seed set**, so comparisons are apples-to-apples. The hint line shows the total vote count (e.g. `2 arms × 5 × 30 = 300 votes`). |
+| **Populations per arm** | How many seeds (2–100) each arm runs. Every arm runs the **same seed set**, so comparisons are apples-to-apples. The hint line shows the total vote count (e.g. `2 arms × 5 × 30 = 300 votes`). |
 | **Run Campaign** | Kicks off the run. A progress bar tracks it seed-by-seed. |
 
 **Results** appear as one **stat card per arm** plus an overlaid **histogram** of Yes-vote % across seeds — a wide spread means the outcome is sensitive to which crowd you drew; well-separated arms mean the factor genuinely moved the vote.

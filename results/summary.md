@@ -4,31 +4,30 @@
 
 | Outcome | Count | % of Valid Votes |
 |---------|-------|-----------------|
-| Yes     | 28     | 93.3%           |
-| No      | 2     | 6.7%           |
+| Yes     | 30     | 100.0%           |
+| No      | 0     | 0.0%           |
 | Error   | 0     | —               |
 | **Total** | **30** | |
 
 ## 2. Top Reasons — Yes
 
-**1. Protect small restaurants from fees** (27 voters)
-  - Representatives: Barbara Robinson, Walter Wang, Joseph Robinson (+24 more)
+**1. Protecting restaurants and workers** (23 voters)
+  - Representatives: Barbara Robinson, Walter Wang, Joseph Robinson (+20 more)
 
-**2. Lower costs benefit consumers** (1 voters)
-  - Representatives: Eugene Park
+**2. Affordability for consumers** (7 voters)
+  - Representatives: Tony Yang, Tina Lee, Graciela Ramirez (+4 more)
 
 ## 3. Top Reasons — No
 
-**1. Opposition to government price controls** (2 voters)
-  - Representatives: Thomas Taylor, Hiro Zhang
+_No No votes recorded._
 
 ## 4. Most Interesting Response
 
-> **Susan Brown**, age 26, Glen Park — Rental Clerk (Vote: **Yes**)
+> **Graciela Ramirez**, age 44, Potrero Hill — Management (Vote: **Yes**)
 >
-> "I think it's important to protect local restaurants and workers from excessive fees, even if it means the apps might adjust pricing elsewhere."
+> "As someone on a tight budget who's felt guilty seeing extra fees pile up over $8 on an order, capping fees at 15% would make supporting local restaurants like the ones in my neighborhood more affordable for working families like mine."
 >
-> _Why this one: By openly conceding the cap might just shift costs elsewhere, Susan Brown acknowledges the No side's core economic objection while still justifying support, making it more credible to skeptics._
+> _Why this one: Selected as the most elaborated response: at 41 words it gives the longest, most detailed reasoning of the 30 valid votes cast._
 
 ## 5. Full Agent Table
 
@@ -46,7 +45,7 @@
 | Andrew Johnson | 79 | Chinatown | Arts/Media | $86,800/yr | Owner | Yes |
 | Nancy Singh | 43 | Portola | Protective Service | $35,000/yr | Renter | Yes |
 | Graciela Ramirez | 44 | Potrero Hill | Management | $60,700/yr | Renter | Yes |
-| Thomas Taylor | 64 | Sunset | Business/Finance | $442,000/yr | Owner | No |
+| Thomas Taylor | 64 | Sunset | Business/Finance | $442,000/yr | Owner | Yes |
 | Linda Clark | 47 | Bayview | Management | $320,000/yr | Renter | Yes |
 | Amy Chen | 47 | Castro | Office/Admin | $106,000/yr | Owner | Yes |
 | Claudia Cruz | 54 | Sunset | Sales | $444,000/yr | Owner | Yes |
@@ -55,7 +54,7 @@
 | Sofia Rodriguez | 58 | Haight-Ashbury | Radiologist | $104,000/yr | Owner | Yes |
 | Adrian Lopez | 37 | Nob Hill | Cleaning/Maintenance | $183,000/yr | Owner | Yes |
 | Susan Harris | 54 | Pacific Heights | Arts/Media | $297,000/yr | Owner | Yes |
-| Hiro Zhang | 38 | Glen Park | Computer/Math | $260,000/yr | Renter | No |
+| Hiro Zhang | 38 | Glen Park | Computer/Math | $260,000/yr | Renter | Yes |
 | Ruben Torres | 35 | Noe Valley | Data Scientist | $76,040/yr | Owner | Yes |
 | Melissa White | 83 | West Portal | Not in labor force | $102,500/yr | Owner | Yes |
 | Michael Chen | 41 | Sunset | Producer/Director | $25,500/yr | Renter | Yes |

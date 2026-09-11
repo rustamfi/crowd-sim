@@ -228,9 +228,14 @@ async def api_vote(
     }
 
 
+MAX_CAMPAIGN_SEEDS = 100  # keep in sync with CAMPAIGN_MAX_N in static/index.html
+
+
 @app.post("/api/campaign/run")
 async def api_campaign_run(
-    seed: int = Query(description="Population seed for this campaign run (1..20)"),
+    seed: int = Query(
+        description=f"Population seed for this campaign run (1..{MAX_CAMPAIGN_SEEDS})"
+    ),
     model: str = Query(
         default=None,
         description="OpenRouter model to vote with (defaults to the server default)",
@@ -266,10 +271,10 @@ async def api_campaign_run(
         )
 
     # Server-side cap so a crafted request can't launch an unbounded run
-    if not 1 <= seed <= 20:
+    if not 1 <= seed <= MAX_CAMPAIGN_SEEDS:
         raise HTTPException(
             status_code=400,
-            detail="seed must be between 1 and 20.",
+            detail=f"seed must be between 1 and {MAX_CAMPAIGN_SEEDS}.",
         )
 
     question = (question or "").strip() or DEFAULT_QUESTION
