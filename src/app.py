@@ -93,7 +93,7 @@ async def health():
 
 
 @app.post("/api/generate")
-async def api_generate(
+def api_generate(
     seed: int = Query(default=42, description="Random seed"),
     memory: bool = Query(
         default=False,
@@ -148,7 +148,7 @@ async def api_config():
 
 
 @app.post("/api/vote")
-async def api_vote(
+def api_vote(
     fresh: bool = Query(default=False, description="Clear cached votes and re-run all agents"),
     model: str = Query(
         default=None,
@@ -232,7 +232,7 @@ MAX_CAMPAIGN_SEEDS = 100  # keep in sync with CAMPAIGN_MAX_N in static/index.htm
 
 
 @app.post("/api/campaign/run")
-async def api_campaign_run(
+def api_campaign_run(
     seed: int = Query(
         description=f"Population seed for this campaign run (1..{MAX_CAMPAIGN_SEEDS})"
     ),
@@ -354,7 +354,7 @@ async def api_get_agents():
 
 
 @app.get("/api/results")
-async def api_get_results():
+def api_get_results():
     """
     Return voting results and summary data. Runs analyze() over current files. REQ-034.
     """
